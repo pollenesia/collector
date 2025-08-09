@@ -1,4 +1,4 @@
-data/
-*.txt
-.vscode
 __pycache__
+.vscode
+*.txt
+data/
