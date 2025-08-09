@@ -58,11 +58,6 @@ def main():
 
     copy_images(image_list)
 
-    # f = open('list.txt', 'wt')
-    # for line in image_list:
-    #     f.write(f'{line}\n')
-    # f.close()
-
 
 if __name__ == '__main__':
     main()

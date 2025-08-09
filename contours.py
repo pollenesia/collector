@@ -1,53 +1,104 @@
 import cv2
 import numpy as np
+import argparse
+
 from matplotlib import pyplot as plt
+from utils import get_logger, get_file_list
+
+logger = get_logger(__name__)
 
 
-img = cv2.imread('data/filtered/250809142446.jpg')
-gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-gray = cv2.bitwise_not(gray)
+def load_image(fname: str):
+    # 'data/filtered/250809142446.jpg'
+    img = cv2.imread(fname)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.bitwise_not(gray)
 
-window = gray.shape[0] // 8 - 1
-threshold = 48
+    window = gray.shape[0] // 16 - 1
+    window += (window - 1) % 2
+    threshold = 60
+    threshold_brightness = threshold * 0.8
 
-background = cv2.GaussianBlur(gray, (window, window), 0)
-gray = cv2.subtract(gray, background)
-gray = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
+    background = cv2.GaussianBlur(gray, (window, window), 0)
+    gray = cv2.subtract(gray, background)
 
-_, thresh = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
+    idx = gray < 24
+    gray[idx] = np.mean(gray)
+    # cv2.imshow('Prepared', gray)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
 
-contours, _ = cv2.findContours(
-    thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    gray = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
 
-n_particles = 0
-b = np.ndarray((0, 2))
-for cnt in contours:
-    area = cv2.contourArea(cnt)
-    x, y, w, h = cv2.boundingRect(cnt)
-    roi = gray[y:y+h, x:x+w]
-    brightness = np.mean(roi)
-    b = np.vstack((b, [area, brightness]))
-    print(brightness)
-    if area >= 4 and area < 500 and brightness > threshold:
-        n_particles += 1
-        cv2.rectangle(gray, (x, y), (x+w, y+h), (255, 0, 0), 1)
+    _, thresh = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
 
-gray_color = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-images = np.hstack((gray_color, img))
-print(f'Particle Number: {n_particles}')
-print(f'Particle Shape: {b.shape}')
+    contours, _ = cv2.findContours(
+        thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-fig, ax = plt.subplots(1, 1)
-ax.scatter(b[:, 0], b[:, 1])
-# ax.axvline(threshold, np.min(b[:, 0]), np.max(b[:, 0]), colors='r')
-ax.axhline(threshold, color='r', alpha=0.3)
-ax.grid()
-ax.set_xlabel('Area')
-ax.set_ylabel('Brightness')
-fig.set_size_inches(16, 9)
-fig.set_tight_layout(True)
-plt.show()
+    n_particles = 0
+    b = np.ndarray((0, 2))
+    gray_color = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
-cv2.imshow('Prepared', gray)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        x, y, w, h = cv2.boundingRect(cnt)
+        roi = gray[y:y+h, x:x+w]
+        brightness = np.mean(roi)
+        b = np.vstack((b, [area, brightness]))
+        if area >= 4 and area < 1000 and brightness > threshold_brightness:
+            n_particles += 1
+            cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 1)
+
+    logger.info(f'Particle Number: {n_particles}')
+    logger.info(f'Particle Shape: {b.shape}')
+
+    # fig, ax = plt.subplots(1, 1)
+    # ax.scatter(b[:, 0], b[:, 1])
+    # ax.axhline(threshold_brightness, color='r', alpha=0.3)
+    # ax.grid()
+    # ax.set_xlabel('Area')
+    # ax.set_ylabel('Brightness')
+    # fig.set_size_inches(16, 9)
+    # fig.set_tight_layout(True)
+    # plt.show()
+
+    # images = np.hstack((gray_color, img))
+    # cv2.imshow('Prepared', images)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
+    return n_particles
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('path', help='path', type=str)
+
+    try:
+        options, _ = parser.parse_known_args()
+        logger.info(vars(options))
+    except Exception as e:
+        logger.error(e)
+        exit(0)
+
+    pattern = options.path
+    flist = get_file_list(pattern, recursive=True)
+
+    n_particles = []
+    for fname in flist:
+        logger.info(fname)
+        n = load_image(fname)
+        n_particles.append(n)
+
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(n_particles, '.-')
+    ax.grid()
+    ax.set_xlabel('Point')
+    ax.set_ylabel('Particle Number')
+    fig.set_size_inches(16, 4.5)
+    fig.set_tight_layout(True)
+    plt.show()
+
+
+if __name__ == '__main__':
+    main()
