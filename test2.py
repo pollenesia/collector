@@ -43,6 +43,7 @@ def get_logger(name: str):
 logger = get_logger(__name__)
 
 PIN_STOP = 12
+PIN_BREAK = 1
 PIN_MOTOR1 = [18, 23, 24, 25]
 PIN_MOTOR2 = [6, 13, 19, 26]
 FORWARD = False
@@ -168,10 +169,23 @@ def pass_tape(range: int):
     logger.info('tape passed')
 
 
+def release_break(release: bool):
+    value = gpio.HIGH if release else gpio.LOW
+    gpio.output(PIN_BREAK, value)
+    logger.info(f'break release set to {release}')
+
+
 logger.info('hello')
 gpio.setmode(gpio.BCM)
 gpio.setup(PIN_STOP, gpio.IN, gpio.PUD_UP)
+gpio.setup(PIN_BREAK, gpio.OUT, initial=gpio.LOW)
 gpio.add_event_detect(PIN_STOP, gpio.BOTH, event_stop, 200)
+
+while True:
+    release_break(True)
+    time.sleep(3.0)
+    release_break(False)
+    time.sleep(3.0)
 
 # is_home = True
 # go_end()
