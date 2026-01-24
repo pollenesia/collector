@@ -161,11 +161,10 @@ def get_data_row(fname: str, dkeys: list[str]):
     return row
 
 
-def pass_tape():
-    range = 128 // 2
+def pass_tape(range: int):
     logger.info(f'passing tape to {range} steps')
     motor2.motor_run(PIN_MOTOR2, 0.01, range,
-                     BACKWARD, False, "half", 0.05)
+                     FORWARD, False, 'full', 0.05)
     logger.info('tape passed')
 
 
@@ -197,15 +196,16 @@ dkeys = [
     'FocusFoM', 'Lux', 'Sharpness', 'Position', 'Position_mm',
 ]
 
-mode = 'a'
+mode = 'm'
 m_step = 100
+m_pass_step = 100
 while True:
-    pass_tape()
-    date = datetime.now()
-    dirname = f'{(date.year % 100):02d}{date.month:02d}{date.day:02d}{date.hour:02d}{date.minute:02d}{date.second:02d}'
-    logger.info(f'dirname: {dirname}')
-    os.makedirs(dirname, exist_ok=True)
     if mode == 'a':
+        pass_tape(64)
+        date = datetime.now()
+        dirname = f'{(date.year % 100):02d}{date.month:02d}{date.day:02d}{date.hour:02d}{date.minute:02d}{date.second:02d}'
+        logger.info(f'dirname: {dirname}')
+        os.makedirs(dirname, exist_ok=True)
         init_camera()
 
         if leave_home():
@@ -264,5 +264,14 @@ while True:
                         m_step /= 10
                         m_step = 1 if m_step < 1 else m_step
                         logger.info(f'step: {m_step}')
+                    elif line == 'p':
+                        pass_tape(m_pass_step)
+                    elif line == '>':
+                        m_pass_step *= 2
+                        logger.info(f'step: {m_pass_step}')
+                    elif line == '<':
+                        m_pass_step /= 2
+                        m_pass_step = 1 if m_pass_step < 1 else m_pass_step
+                        logger.info(f'step: {m_pass_step}')
         except KeyboardInterrupt:
             logger.info('exit')
