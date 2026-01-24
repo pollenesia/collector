@@ -183,7 +183,9 @@ gpio.add_event_detect(PIN_STOP, gpio.BOTH, event_stop, 200)
 
 while True:
     release_break(True)
-    time.sleep(3.0)
+    time.sleep(1.0)
+    pass_tape(64)
+    time.sleep(1.0)
     release_break(False)
     time.sleep(3.0)
 
