@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import argparse
+import os
 
 from matplotlib import pyplot as plt
 from utils import get_logger, get_file_list
@@ -14,7 +15,7 @@ def load_image(fname: str):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     gray = cv2.bitwise_not(gray)
 
-    window = gray.shape[0] // 16 - 1
+    window = gray.shape[0] // 11 - 1
     window += (window - 1) % 2
     threshold = 60
     threshold_brightness = threshold * 0.8
@@ -42,10 +43,11 @@ def load_image(fname: str):
     for cnt in contours:
         area = cv2.contourArea(cnt)
         x, y, w, h = cv2.boundingRect(cnt)
+        ratio = max(w / h, h / w)
         roi = gray[y:y+h, x:x+w]
         brightness = np.mean(roi)
         b = np.vstack((b, [area, brightness]))
-        if area >= 4 and area < 1000 and brightness > threshold_brightness:
+        if area >= 4 and area < 1000 and brightness > threshold_brightness and ratio < 3:
             n_particles += 1
             cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 1)
 
@@ -62,8 +64,20 @@ def load_image(fname: str):
     # fig.set_tight_layout(True)
     # plt.show()
 
+    font = cv2.FONT_HERSHEY_DUPLEX
+    # text,coordinate,font,size of text,color,thickness of font
+    label = f'Particle Number: {n_particles:2d}'
+    cv2.putText(img, label, (32, 32), font, 1, (0, 255, 255), 1)
+
+    ofname = os.path.basename(fname)
+    dirname = os.path.dirname(fname)
+    dirname = os.path.join(dirname, os.pardir)
+    ofname = os.path.join(dirname, 'processed', ofname)
+    ofname = os.path.relpath(ofname)
+    cv2.imwrite(ofname, img)
+
     # images = np.hstack((gray_color, img))
-    # cv2.imshow('Prepared', images)
+    # cv2.imshow('Prepared', img)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
 
@@ -90,11 +104,15 @@ def main():
         n = load_image(fname)
         n_particles.append(n)
 
+    n_particles = np.array(n_particles)
+    t = np.arange(n_particles.shape[0]) * 600.0 / 3600.0
     fig, ax = plt.subplots(1, 1)
-    ax.plot(n_particles, '.-')
+    ax.plot(t, n_particles, '.-')
     ax.grid()
-    ax.set_xlabel('Point')
+    ax.set_xlabel('Hours')
     ax.set_ylabel('Particle Number')
+    # ax.set_xlim(0, t[-1])
+    ax.set_xlim(0)
     fig.set_size_inches(16, 4.5)
     fig.set_tight_layout(True)
     plt.show()

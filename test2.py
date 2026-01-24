@@ -1,12 +1,12 @@
 
 import RPi.GPIO as gpio
+import logging
 import time
 import sys
 import cv2
 import numpy as np
 import os
 
-from utils import get_logger
 from datetime import datetime
 from picamera2 import Picamera2
 from RpiMotorLib import RpiMotorLib as rml
@@ -15,6 +15,9 @@ from h5py import File
 '''bash
 rpicam-vid -o udp://192.168.1.64:8888 -t0 -v0 --flush=1 --framerate=10
 ffplay udp://@:8888 -fflags nobuffer -flags low_delay -framedrop
+
+rpicam-vid -o - -t0 -v0 --flush --inline --nopreview --framerate=30 --codec=yuv420 --width 1024 --height 1024 | nc -t4lp 8888
+ffplay tcp://rpi1.local:8888 -f rawvideo -fflags nobuffer -pixel_format yuv420p -video_size 1024x1024 -framerate 30
 '''
 
 LOG_FORMAT = f"%(asctime)s [%(levelname)s] %(filename)s %(funcName)s(%(lineno)d): %(message)s"
@@ -25,6 +28,16 @@ THREAD_N = THREAD_LENGTH_MM / THREAD_STEP_MM
 MAX_STEPS = int(512.0 * THREAD_N)
 
 STEP_WAIT = 0.002
+
+
+def get_logger(name: str):
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.INFO)
+    stream_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    logger.addHandler(stream_handler)
+    return logger
 
 
 logger = get_logger(__name__)
@@ -185,6 +198,7 @@ dkeys = [
 ]
 
 mode = 'a'
+m_step = 100
 while True:
     pass_tape()
     date = datetime.now()
@@ -229,7 +243,7 @@ while True:
                     break
                 else:
                     steps = go_steps(10)
-                    time.sleep(0.2)
+                    # time.sleep(0.2)
                     row = get_data_row(
                         f'{dirname}/image{i_image:03d}.jpg', dkeys)
                     data = np.vstack((data, row))
@@ -238,10 +252,17 @@ while True:
                 for line in sys.stdin:
                     line = line.rstrip()
                     if line == 'f':
-                        motor1.motor_run(PIN_MOTOR1, STEP_WAIT, 10,
+                        motor1.motor_run(PIN_MOTOR1, STEP_WAIT, m_step,
                                          FORWARD, False, "full", 0.05)
                     elif line == 'b':
-                        motor1.motor_run(PIN_MOTOR1, STEP_WAIT, 10,
+                        motor1.motor_run(PIN_MOTOR1, STEP_WAIT, m_step,
                                          BACKWARD, False, "full", 0.05)
+                    elif line == 'i':
+                        m_step *= 10
+                        logger.info(f'step: {m_step}')
+                    elif line == 'd':
+                        m_step /= 10
+                        m_step = 1 if m_step < 1 else m_step
+                        logger.info(f'step: {m_step}')
         except KeyboardInterrupt:
             logger.info('exit')
