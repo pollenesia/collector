@@ -1,4 +1,3 @@
 __pycache__
-.vscode
-*.txt
-data/
+dist
+*.egg-info

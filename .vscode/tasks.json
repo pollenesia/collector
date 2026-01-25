@@ -1,0 +1,79 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "python3",
+            "args": [
+                "-m",
+                "build",
+                "."
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "clean",
+            "type": "shell",
+            "command": "rm",
+            "args": [
+                "-r",
+                "dist"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "install",
+            "type": "shell",
+            "command": "pip3",
+            "args": [
+                "install",
+                "dist/*.whl",
+                "--break-system-packages"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "dependsOn": [
+                "uninstall"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "uninstall",
+            "type": "shell",
+            "command": "pip3",
+            "args": [
+                "uninstall",
+                "-y",
+                "pollenesia",
+                "--break-system-packages"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "increment patch",
+            "type": "shell",
+            "command": "bump2version",
+            "args": [
+                // "--allow-dirty",
+                "patch"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "dependsOn": [
+                "clean"
+            ],
+            "problemMatcher": []
+        }
+    ]
+}
