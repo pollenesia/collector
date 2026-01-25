@@ -1,16 +1,17 @@
 
-import RPi.GPIO as gpio
-import logging
-import time
-import sys
+import argparse
 import cv2
+import logging
 import numpy as np
 import os
+import RPi.GPIO as gpio
+import sys
+import time
 
 from datetime import datetime
+from h5py import File
 from picamera2 import Picamera2
 from RpiMotorLib import RpiMotorLib as rml
-from h5py import File
 
 '''bash
 rpicam-vid -o udp://192.168.1.64:8888 -t0 -v0 --flush=1 --framerate=10
@@ -175,119 +176,134 @@ def release_break(release: bool):
     logger.info(f'break release set to {release}')
 
 
-logger.info('hello')
-gpio.setmode(gpio.BCM)
-gpio.setup(PIN_STOP, gpio.IN, gpio.PUD_UP)
-gpio.setup(PIN_BREAK, gpio.OUT, initial=gpio.LOW)
-gpio.add_event_detect(PIN_STOP, gpio.BOTH, event_stop, 200)
-
-while True:
-    release_break(True)
-    time.sleep(1.0)
-    pass_tape(64)
-    time.sleep(1.0)
-    release_break(False)
-    time.sleep(3.0)
-
-# is_home = True
-# go_end()
-# exit()
-
-# while True:
-#     try:
-#         for line in sys.stdin:
-#             line = line.rstrip()
-#             if line == 'b':
-#                 motor2.motor_run(PIN_MOTOR2, 0.01, 512,
-#                                  BACKWARD, False, "half", 0.05)
-#     except KeyboardInterrupt:
-#         logger.info('exit')
-# exit(0)
+def init():
+    logger.info('hello')
+    gpio.setmode(gpio.BCM)
+    gpio.setup(PIN_STOP, gpio.IN, gpio.PUD_UP)
+    gpio.setup(PIN_BREAK, gpio.OUT, initial=gpio.LOW)
+    gpio.add_event_detect(PIN_STOP, gpio.BOTH, event_stop, 200)
 
 
-# exit(0)
-
-dkeys = [
-    'SensorTimestamp', 'ExposureTime',
-    'FocusFoM', 'Lux', 'Sharpness', 'Position', 'Position_mm',
-]
-
-mode = 'm'
-m_step = 100
-m_pass_step = 100
-while True:
-    if mode == 'a':
-        pass_tape(64)
-        date = datetime.now()
-        dirname = f'{(date.year % 100):02d}{date.month:02d}{date.day:02d}{date.hour:02d}{date.minute:02d}{date.second:02d}'
-        logger.info(f'dirname: {dirname}')
-        os.makedirs(dirname, exist_ok=True)
-        init_camera()
-
-        if leave_home():
-            if go_home():
-                pass
-            else:
-                logger.error('no home')
-                exit(-1)
-        else:
-            logger.error('limit switch stuck')
-            exit(-1)
-
-    data = np.ndarray((0, len(dkeys)))
-    logger.info(data.shape)
-    steps = 0
-    i_image = 0
+def test_passing_with_brake():
     while True:
-        try:
-            if mode == 'a':
-                position_mm = steps / 512.0 * THREAD_STEP_MM
-                if position_mm < 15.0:
-                    steps = go_steps(512)
-                elif position_mm >= 20.0:
-                    logger.info(f'storing {dirname}/data.h5')
-                    f = File(f'{dirname}/data.h5', 'w')
-                    f['data'] = data
-                    f['data'].attrs['header'] = dkeys
-                    f.close()
-                    dt = (datetime.now() - date).seconds
-                    sleep_time = 600.0 - dt
-                    logger.info(f'cycle time is {dt}s, sleep {sleep_time}s')
-                    if sleep_time > 0:
-                        time.sleep(sleep_time)
-                    logger.info('finish')
-                    break
+        release_break(True)
+        time.sleep(1.0)
+        pass_tape(64)
+        time.sleep(1.0)
+        release_break(False)
+        time.sleep(3.0)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    # parser.add_argument('input', help='input', nargs='+', type=str)
+    parser.add_argument('--output', help='output dir', default='.', type=str)
+
+    try:
+        options, _ = parser.parse_known_args()
+        logger.info(vars(options))
+    except Exception as e:
+        logger.error(e)
+        exit(0)
+
+    options.output = os.path.expanduser(options.output)
+    if not os.path.exists(options.output):
+        os.makedirs(options.output)
+
+    init()
+    test_passing_with_brake()
+
+    is_home = True
+    go_end()
+
+    dkeys = [
+        'SensorTimestamp', 'ExposureTime',
+        'FocusFoM', 'Lux', 'Sharpness', 'Position', 'Position_mm',
+    ]
+
+    mode = 'm'
+    m_step = 100
+    m_pass_step = 100
+    while True:
+        if mode == 'a':
+            pass_tape(64)
+            date = datetime.now()
+            dirname = f'{(date.year % 100):02d}{date.month:02d}{date.day:02d}{date.hour:02d}{date.minute:02d}{date.second:02d}'
+            logger.info(f'dirname: {dirname}')
+            os.makedirs(dirname, exist_ok=True)
+            init_camera()
+
+            if leave_home():
+                if go_home():
+                    pass
                 else:
-                    steps = go_steps(10)
-                    # time.sleep(0.2)
-                    row = get_data_row(
-                        f'{dirname}/image{i_image:03d}.jpg', dkeys)
-                    data = np.vstack((data, row))
-                    i_image += 1
+                    logger.error('no home')
+                    exit(-1)
             else:
-                for line in sys.stdin:
-                    line = line.rstrip()
-                    if line == 'f':
-                        motor1.motor_run(PIN_MOTOR1, STEP_WAIT, m_step,
-                                         FORWARD, False, "full", 0.05)
-                    elif line == 'b':
-                        motor1.motor_run(PIN_MOTOR1, STEP_WAIT, m_step,
-                                         BACKWARD, False, "full", 0.05)
-                    elif line == 'i':
-                        m_step *= 10
-                        logger.info(f'step: {m_step}')
-                    elif line == 'd':
-                        m_step /= 10
-                        m_step = 1 if m_step < 1 else m_step
-                        logger.info(f'step: {m_step}')
-                    elif line == 'p':
-                        pass_tape(m_pass_step)
-                    elif line == '>':
-                        m_pass_step *= 2
-                        logger.info(f'step: {m_pass_step}')
-                    elif line == '<':
-                        m_pass_step /= 2
-                        m_pass_step = 1 if m_pass_step < 1 else m_pass_step
-                        logger.info(f'step: {m_pass_step}')
-        except KeyboardInterrupt:
-            logger.info('exit')
+                logger.error('limit switch stuck')
+                exit(-1)
+
+        data = np.ndarray((0, len(dkeys)))
+        logger.info(data.shape)
+        steps = 0
+        i_image = 0
+        while True:
+            try:
+                if mode == 'a':
+                    position_mm = steps / 512.0 * THREAD_STEP_MM
+                    if position_mm < 15.0:
+                        steps = go_steps(512)
+                    elif position_mm >= 20.0:
+                        logger.info(f'storing {dirname}/data.h5')
+                        f = File(f'{dirname}/data.h5', 'w')
+                        f['data'] = data
+                        f['data'].attrs['header'] = dkeys
+                        f.close()
+                        dt = (datetime.now() - date).seconds
+                        sleep_time = 600.0 - dt
+                        logger.info(
+                            f'cycle time is {dt}s, sleep {sleep_time}s')
+                        if sleep_time > 0:
+                            time.sleep(sleep_time)
+                        logger.info('finish')
+                        break
+                    else:
+                        steps = go_steps(10)
+                        # time.sleep(0.2)
+                        row = get_data_row(
+                            f'{dirname}/image{i_image:03d}.jpg', dkeys)
+                        data = np.vstack((data, row))
+                        i_image += 1
+                else:
+                    for line in sys.stdin:
+                        line = line.rstrip()
+                        if line == 'f':
+                            motor1.motor_run(PIN_MOTOR1, STEP_WAIT, m_step,
+                                             FORWARD, False, "full", 0.05)
+                        elif line == 'b':
+                            motor1.motor_run(PIN_MOTOR1, STEP_WAIT, m_step,
+                                             BACKWARD, False, "full", 0.05)
+                        elif line == 'i':
+                            m_step *= 10
+                            logger.info(f'step: {m_step}')
+                        elif line == 'd':
+                            m_step /= 10
+                            m_step = 1 if m_step < 1 else m_step
+                            logger.info(f'step: {m_step}')
+                        elif line == 'p':
+                            pass_tape(m_pass_step)
+                        elif line == '>':
+                            m_pass_step *= 2
+                            logger.info(f'step: {m_pass_step}')
+                        elif line == '<':
+                            m_pass_step /= 2
+                            m_pass_step = 1 if m_pass_step < 1 else m_pass_step
+                            logger.info(f'step: {m_pass_step}')
+            except KeyboardInterrupt:
+                logger.info('exit')
+
+        exit(0)
+
+
+if __name__ == '__main__':
+    main()
