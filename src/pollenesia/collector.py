@@ -7,6 +7,8 @@ import os
 import RPi.GPIO as gpio
 import sys
 import time
+import paho.mqtt.client as mqtt
+import json
 
 from datetime import datetime
 from h5py import File
@@ -194,9 +196,45 @@ def test_passing_with_brake():
         time.sleep(3.0)
 
 
+def on_message(client, userdata, msg):
+    data = json.loads(msg.payload)
+    logger.info(f"Received `{data}` from `{msg.topic}` topic")
+    command = data['command']
+    if command == 'release-break':
+        release_break(data['value'])
+
+
+def init_mqtt() -> mqtt.Client:
+    client = mqtt.Client(
+        callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+        protocol=mqtt.MQTTv5,
+        transport='websockets',
+        reconnect_on_failure=True
+    )
+
+    client.username_pw_set(username='user', password='12345678')
+
+    client.connect(
+        host='localhost',
+        port=9001
+    )
+
+    client.subscribe('pollenesia/collector')
+    client.on_message = on_message
+
+    # client.loop_start()
+
+    return client
+
+
 def main():
     parser = argparse.ArgumentParser()
-    # parser.add_argument('input', help='input', nargs='+', type=str)
+    # parser.add_argument(
+    #     'host',
+    #     default='localhost',
+    #     help='MQTT host',
+    #     type=str
+    # )
     parser.add_argument('--output', help='output dir', default='.', type=str)
 
     try:
@@ -211,6 +249,10 @@ def main():
         os.makedirs(options.output)
 
     init()
+    mqtt_client = init_mqtt()
+    mqtt_client.loop_forever()
+    exit(0)
+
     test_passing_with_brake()
 
     is_home = True
