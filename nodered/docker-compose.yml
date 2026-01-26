@@ -1,0 +1,22 @@
+# @flowfuse/node-red-dashboard
+# @hotnipi/node-red-dashboard-2-ui-gauge-linear
+
+services:
+  node-red:
+    image: nodered/node-red:latest
+    container_name: nodered
+    environment:
+      - TZ=Europe/Moscow
+    ports:
+      - "1880:1880"
+    networks:
+      - node-red-net
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
+volumes:
+  node-red-data:
+
+networks:
+  node-red-net:
