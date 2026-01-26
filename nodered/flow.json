@@ -1,0 +1,302 @@
+[
+    {
+        "id": "a4bf15b2c71a9148",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "9a01bdb58b214d06",
+        "type": "mqtt in",
+        "z": "a4bf15b2c71a9148",
+        "name": "",
+        "topic": "test",
+        "qos": "2",
+        "datatype": "auto-detect",
+        "broker": "a77fcd7cc00e6bf0",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 230,
+        "y": 320,
+        "wires": [
+            [
+                "65b009ebac99ba2d"
+            ]
+        ]
+    },
+    {
+        "id": "65b009ebac99ba2d",
+        "type": "debug",
+        "z": "a4bf15b2c71a9148",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 440,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "fc178ddb26261d8c",
+        "type": "mqtt out",
+        "z": "a4bf15b2c71a9148",
+        "name": "",
+        "topic": "pollenesia/collector",
+        "qos": "1",
+        "retain": "false",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "a77fcd7cc00e6bf0",
+        "x": 770,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "403c62c0b172f84d",
+        "type": "ui-button",
+        "z": "a4bf15b2c71a9148",
+        "group": "22f08e72f8c615d8",
+        "name": "",
+        "label": "button",
+        "order": 2,
+        "width": 0,
+        "height": 0,
+        "emulateClick": false,
+        "tooltip": "",
+        "color": "",
+        "bgcolor": "",
+        "className": "",
+        "icon": "",
+        "iconPosition": "left",
+        "payload": "{\"command\":\"release-break\",\"value\":true}",
+        "payloadType": "json",
+        "topic": "topic",
+        "topicType": "msg",
+        "buttonColor": "",
+        "textColor": "",
+        "iconColor": "",
+        "enableClick": true,
+        "enablePointerdown": false,
+        "pointerdownPayload": "",
+        "pointerdownPayloadType": "str",
+        "enablePointerup": false,
+        "pointerupPayload": "",
+        "pointerupPayloadType": "str",
+        "x": 130,
+        "y": 440,
+        "wires": [
+            [
+                "fc178ddb26261d8c"
+            ]
+        ]
+    },
+    {
+        "id": "0c072dd665f86ad0",
+        "type": "ui-switch",
+        "z": "a4bf15b2c71a9148",
+        "name": "release-break",
+        "label": "Release Break",
+        "group": "22f08e72f8c615d8",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "passthru": false,
+        "decouple": false,
+        "topic": "topic",
+        "topicType": "msg",
+        "style": "",
+        "className": "",
+        "layout": "row-left",
+        "clickableArea": "switch",
+        "onvalue": "true",
+        "onvalueType": "bool",
+        "onicon": "",
+        "oncolor": "",
+        "offvalue": "false",
+        "offvalueType": "bool",
+        "officon": "",
+        "offcolor": "",
+        "x": 160,
+        "y": 500,
+        "wires": [
+            [
+                "286e045f9c024275"
+            ]
+        ]
+    },
+    {
+        "id": "286e045f9c024275",
+        "type": "function",
+        "z": "a4bf15b2c71a9148",
+        "name": "function 1",
+        "func": "let payload = {\n    'command': 'release-break', \n    'value': msg.payload\n};\n\nlet msg0 = {};\n\nmsg0.payload = payload;\n\nreturn msg0;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 340,
+        "y": 500,
+        "wires": [
+            [
+                "2caca89966b49a84"
+            ]
+        ]
+    },
+    {
+        "id": "2caca89966b49a84",
+        "type": "json",
+        "z": "a4bf15b2c71a9148",
+        "name": "",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 490,
+        "y": 500,
+        "wires": [
+            [
+                "fc178ddb26261d8c"
+            ]
+        ]
+    },
+    {
+        "id": "a77fcd7cc00e6bf0",
+        "type": "mqtt-broker",
+        "name": "",
+        "broker": "172.22.0.1",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "5",
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "22f08e72f8c615d8",
+        "type": "ui-group",
+        "name": "Group 1",
+        "page": "9a0b62ef10788322",
+        "width": 6,
+        "height": 1,
+        "order": 1,
+        "showTitle": true,
+        "className": "",
+        "visible": true,
+        "disabled": false,
+        "groupType": "default"
+    },
+    {
+        "id": "9a0b62ef10788322",
+        "type": "ui-page",
+        "name": "Page 1",
+        "ui": "ebd61270c941d1f7",
+        "path": "/page1",
+        "icon": "home",
+        "layout": "grid",
+        "theme": "b2280cde75229292",
+        "breakpoints": [
+            {
+                "name": "Default",
+                "px": 0,
+                "cols": 3
+            },
+            {
+                "name": "Tablet",
+                "px": 576,
+                "cols": 6
+            },
+            {
+                "name": "Small Desktop",
+                "px": 768,
+                "cols": 9
+            },
+            {
+                "name": "Desktop",
+                "px": 1024,
+                "cols": 12
+            }
+        ],
+        "order": 1,
+        "className": "",
+        "visible": "true",
+        "disabled": "false"
+    },
+    {
+        "id": "ebd61270c941d1f7",
+        "type": "ui-base",
+        "name": "My Dashboard",
+        "path": "/dashboard",
+        "appIcon": "",
+        "includeClientData": true,
+        "acceptsClientConfig": [
+            "ui-notification",
+            "ui-control"
+        ],
+        "showPathInSidebar": false,
+        "headerContent": "page",
+        "navigationStyle": "default",
+        "titleBarStyle": "default",
+        "showReconnectNotification": true,
+        "notificationDisplayTime": 1,
+        "showDisconnectNotification": true,
+        "allowInstall": false
+    },
+    {
+        "id": "b2280cde75229292",
+        "type": "ui-theme",
+        "name": "Default Theme",
+        "colors": {
+            "surface": "#ffffff",
+            "primary": "#0094CE",
+            "bgPage": "#eeeeee",
+            "groupBg": "#ffffff",
+            "groupOutline": "#cccccc"
+        },
+        "sizes": {
+            "density": "default",
+            "pagePadding": "12px",
+            "groupGap": "12px",
+            "groupBorderRadius": "4px",
+            "widgetGap": "12px"
+        }
+    },
+    {
+        "id": "030e521262a822e7",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "@flowfuse/node-red-dashboard": "1.30.2"
+        }
+    }
+]
