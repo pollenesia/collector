@@ -1,18 +1,21 @@
 
 import argparse
+import base64
 import cv2
+import json
 import logging
 import numpy as np
 import os
+import paho.mqtt.client as mqtt
 import RPi.GPIO as gpio
 import sys
 import time
-import paho.mqtt.client as mqtt
-import json
 
 from datetime import datetime
 from h5py import File
+from io import BytesIO
 from picamera2 import Picamera2
+from PIL import Image
 from RpiMotorLib import RpiMotorLib as rml
 
 '''bash
@@ -26,7 +29,7 @@ ffplay tcp://rpi1.local:8888 -f rawvideo -fflags nobuffer -pixel_format yuv420p 
 LOG_FORMAT = f"%(asctime)s [%(levelname)s] %(filename)s %(funcName)s(%(lineno)d): %(message)s"
 
 THREAD_STEP_MM = 0.8
-THREAD_LENGTH_MM = 35.0
+THREAD_LENGTH_MM = 30.0
 THREAD_N = THREAD_LENGTH_MM / THREAD_STEP_MM
 MAX_STEPS = int(512.0 * THREAD_N)
 
@@ -47,7 +50,7 @@ def get_logger(name: str):
 logger = get_logger(__name__)
 
 PIN_STOP = 12
-PIN_BREAK = 1
+PIN_BREAK = 7
 PIN_MOTOR1 = [18, 23, 24, 25]
 PIN_MOTOR2 = [6, 13, 19, 26]
 FORWARD = False
@@ -81,9 +84,12 @@ def go_end(din: dict) -> dict:
     return dout
 
 
-def go_steps(steps: int) -> int:
-    global is_home
-    global position_step
+def go_steps(din: dict) -> dict:
+    motor = din['motor_camera']
+    is_home = din['is_home']
+    position_step = din['position_step']
+    steps = int(din['value'])
+
     if is_home:
         position_step1 = position_step + steps
         if position_step1 > MAX_STEPS:
@@ -92,14 +98,15 @@ def go_steps(steps: int) -> int:
             steps = -position_step
 
         if steps > 0:
-            motor1.motor_run(PIN_MOTOR1, STEP_WAIT, steps,
-                             FORWARD, False, "full", 0.05)
+            motor.motor_run(PIN_MOTOR1, STEP_WAIT, steps,
+                            FORWARD, False, "full", 0.05)
         elif steps < 0:
-            motor1.motor_run(PIN_MOTOR1, STEP_WAIT, abs(steps),
-                             BACKWARD, False, "full", 0.05)
+            motor.motor_run(PIN_MOTOR1, STEP_WAIT, abs(steps),
+                            BACKWARD, False, "full", 0.05)
         position_step += steps
-
-    return position_step
+    dout = {}
+    dout['position_step'] = position_step
+    return dout
 
 
 def leave_home() -> bool:
@@ -143,9 +150,13 @@ def init_camera():
     return camera
 
 
-def get_image(fname: str) -> dict[str, any]:
+def get_image_file(camera: Picamera2, fname: str) -> dict[str, any]:
     data = camera.capture_file(fname)
-    # logger.info(data)
+    return data
+
+
+def get_image(camera: Picamera2) -> Image:
+    data = camera.capture_image()
     return data
 
 
@@ -155,8 +166,8 @@ def get_sharpness(fname: str):
     return lv
 
 
-def get_data_row(fname: str, dkeys: list[str]):
-    dimage = get_image(fname)
+def get_data_row(camera: Picamera2, fname: str, dkeys: list[str]):
+    dimage = get_image(camera, fname)
     n = len(dkeys)
     row = np.ndarray(n)
     for i, key in enumerate(dkeys[:-3]):
@@ -194,7 +205,7 @@ def init() -> dict:
     data['motor_tape'] = rml.BYJMotor('tape', '28BYJ')
 
     logger.info('camera')
-    # data['camera'] = init_camera()
+    data['camera'] = init_camera()
 
     logger.info('variables')
     data['is_home'] = False
@@ -224,6 +235,11 @@ def on_message(client, userdata, msg):
         userdata['command'] = 'go_home'
     elif command == 'end':
         userdata['command'] = 'go_end'
+    elif command == 'get_image':
+        userdata['command'] = 'get_image'
+    elif command == 'go_steps':
+        userdata['command'] = 'go_steps'
+        userdata['value'] = data['value']
 
 
 def init_mqtt(userdata) -> mqtt.Client:
@@ -333,8 +349,8 @@ def main():
                     else:
                         steps = go_steps(10)
                         # time.sleep(0.2)
-                        row = get_data_row(
-                            f'{dirname}/image{i_image:03d}.jpg', dkeys)
+                        fname = f'{dirname}/image{i_image:03d}.jpg'
+                        row = get_data_row(data['camera'], fname, dkeys)
                         img_data = np.vstack((img_data, row))
                         i_image += 1
                 elif mode == 'manual':
@@ -345,6 +361,21 @@ def main():
                     elif command == 'go_end':
                         d = go_end(data)
                         data.update(d)
+                    elif command == 'get_image':
+                        image = get_image(data['camera'])
+                        buffer = BytesIO()
+                        image.save(buffer, format='webp')
+                        b = buffer.getvalue()
+                        s = base64.b64encode(b).decode('utf-8')
+                        payload = f'data:image/webp;base64,{s}'
+                        mqtt_client.publish('pollenesia/img', payload=payload)
+                        data['command'] = ''
+                    elif command == 'go_steps':
+                        d = go_steps(data)
+                        data.update(d)
+                        data['command'] = ''
+                        data['value'] = 0
+
                     time.sleep(0.1)
                     # for line in sys.stdin:
                     #     line = line.rstrip()
