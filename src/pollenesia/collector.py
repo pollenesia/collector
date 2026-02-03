@@ -8,7 +8,6 @@ import numpy as np
 import os
 import paho.mqtt.client as mqtt
 import RPi.GPIO as gpio
-import sys
 import time
 
 from datetime import datetime
@@ -57,6 +56,10 @@ FORWARD = False
 BACKWARD = True
 
 
+def is_home() -> bool:
+    return gpio.input(PIN_STOP) == False
+
+
 def go_home(din: dict) -> dict:
     dout = {}
     motor = din['motor_camera']
@@ -66,31 +69,29 @@ def go_home(din: dict) -> dict:
         motor.motor_run(PIN_MOTOR1, STEP_WAIT, MAX_STEPS,
                         BACKWARD, False, "full", 0.05)
         dout['position_step'] = 0
-
-    dout['is_home'] = gpio.input(PIN_STOP) == False
-    dout['command'] = ''
+    dout['is_home_fixed'] = is_home()
     return dout
 
 
 def go_end(din: dict) -> dict:
     dout = {}
     motor = din['motor_camera']
-    is_home = din['is_home']
-    if is_home:
+    is_home_fixed = din['is_home_fixed']
+    if is_home_fixed:
         logger.info('moving to end')
         motor.motor_run(PIN_MOTOR1, STEP_WAIT, MAX_STEPS,
                         FORWARD, False, "full", 0.05)
-    dout['command'] = ''
+    dout['position_step'] = MAX_STEPS
     return dout
 
 
 def go_steps(din: dict) -> dict:
     motor = din['motor_camera']
-    is_home = din['is_home']
+    is_home_fixed = din['is_home_fixed']
     position_step = din['position_step']
     steps = int(din['value'])
 
-    if is_home:
+    if is_home_fixed:
         position_step1 = position_step + steps
         if position_step1 > MAX_STEPS:
             steps = MAX_STEPS - position_step
@@ -122,15 +123,15 @@ def leave_home() -> bool:
 def event_stop(channel: int):
     global DATA_CALLBACK
     motor = DATA_CALLBACK['motor_camera']
-    is_home = DATA_CALLBACK['is_home']
+    is_home_fixed = DATA_CALLBACK['is_home_fixed']
     try:
         is_released = gpio.input(PIN_STOP)
-        if is_home and is_released:
+        if is_home_fixed and is_released:
             logger.info('home leaved')
-        elif is_home and not is_released:
+        elif is_home_fixed and not is_released:
             motor.motor_stop()
             logger.info('home reached')
-        elif not is_home and is_released:
+        elif not is_home_fixed and is_released:
             motor.motor_stop()
             logger.info('limit switch released')
         else:
@@ -178,17 +179,19 @@ def get_data_row(camera: Picamera2, fname: str, dkeys: list[str]):
     return row
 
 
-def pass_tape(range: int):
-    logger.info(f'passing tape to {range} steps')
-    motor2.motor_run(PIN_MOTOR2, 0.01, range,
-                     FORWARD, False, 'full', 0.05)
-    logger.info('tape passed')
-
-
 def release_break(release: bool):
     value = gpio.HIGH if release else gpio.LOW
     gpio.output(PIN_BREAK, value)
     logger.info(f'break release set to {release}')
+
+
+def pass_tape(motor: rml.BYJMotor, range: int):
+    release_break(True)
+    logger.info(f'passing tape to {range} steps')
+    motor.motor_run(PIN_MOTOR2, 0.01, range,
+                    FORWARD, False, 'full', 0.05)
+    logger.info('tape passed')
+    release_break(False)
 
 
 def init() -> dict:
@@ -208,7 +211,7 @@ def init() -> dict:
     data['camera'] = init_camera()
 
     logger.info('variables')
-    data['is_home'] = False
+    data['is_home_fixed'] = False
     data['position_step'] = 0
     data['command'] = ''
     DATA_CALLBACK = data
@@ -229,17 +232,21 @@ def on_message(client, userdata, msg):
     data = json.loads(msg.payload)
     logger.info(f"Received `{data}` from `{msg.topic}` topic")
     command = data['command']
-    if command == 'release-break':
+    if command == 'release_break':
         release_break(data['value'])
-    elif command == 'home':
+    elif command == 'go_home':
         userdata['command'] = 'go_home'
-    elif command == 'end':
+    elif command == 'go_end':
         userdata['command'] = 'go_end'
     elif command == 'get_image':
         userdata['command'] = 'get_image'
     elif command == 'go_steps':
         userdata['command'] = 'go_steps'
         userdata['value'] = data['value']
+    elif command == 'pass_tape':
+        userdata['command'] = 'pass_tape'
+    else:
+        logger.warning(f'unknown command {data}')
 
 
 def init_mqtt(userdata) -> mqtt.Client:
@@ -355,6 +362,7 @@ def main():
                         i_image += 1
                 elif mode == 'manual':
                     command = data['command']
+                    data['command'] = ''
                     if command == 'go_home':
                         d = go_home(data)
                         data.update(d)
@@ -373,34 +381,11 @@ def main():
                     elif command == 'go_steps':
                         d = go_steps(data)
                         data.update(d)
-                        data['command'] = ''
                         data['value'] = 0
+                    elif command == 'pass_tape':
+                        pass_tape(data['motor_tape'], m_pass_step)
 
                     time.sleep(0.1)
-                    # for line in sys.stdin:
-                    #     line = line.rstrip()
-                    #     if line == 'f':
-                    #         motor1.motor_run(PIN_MOTOR1, STEP_WAIT, m_step,
-                    #                          FORWARD, False, "full", 0.05)
-                    #     elif line == 'b':
-                    #         motor1.motor_run(PIN_MOTOR1, STEP_WAIT, m_step,
-                    #                          BACKWARD, False, "full", 0.05)
-                    #     elif line == 'i':
-                    #         m_step *= 10
-                    #         logger.info(f'step: {m_step}')
-                    #     elif line == 'd':
-                    #         m_step /= 10
-                    #         m_step = 1 if m_step < 1 else m_step
-                    #         logger.info(f'step: {m_step}')
-                    #     elif line == 'p':
-                    #         pass_tape(m_pass_step)
-                    #     elif line == '>':
-                    #         m_pass_step *= 2
-                    #         logger.info(f'step: {m_pass_step}')
-                    #     elif line == '<':
-                    #         m_pass_step /= 2
-                    #         m_pass_step = 1 if m_pass_step < 1 else m_pass_step
-                    #         logger.info(f'step: {m_pass_step}')
             except KeyboardInterrupt:
                 logger.info('exit')
 
