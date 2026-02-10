@@ -271,6 +271,17 @@ def init_mqtt(userdata) -> mqtt.Client:
     return client
 
 
+def send_state(data: dict):
+    mqtt_client: mqtt.Client
+    mqtt_client = data['mqtt_client']
+    d = {
+        'is_home_fixed': data['is_home_fixed'],
+        'position_step': data['position_step'],
+    }
+    payload = json.dumps(d)
+    mqtt_client.publish('pollenesia/state', payload=payload)
+
+
 def main():
     parser = argparse.ArgumentParser()
     # parser.add_argument(
@@ -296,6 +307,7 @@ def main():
     mqtt_client = init_mqtt(data)
 
     mqtt_client.loop_start()
+    data['mqtt_client'] = mqtt_client
     # mqtt_client.loop_forever()
 
     # test_passing_with_brake()
@@ -384,7 +396,7 @@ def main():
                         data['value'] = 0
                     elif command == 'pass_tape':
                         pass_tape(data['motor_tape'], m_pass_step)
-
+                    send_state(data)
                     time.sleep(0.1)
             except KeyboardInterrupt:
                 logger.info('exit')
