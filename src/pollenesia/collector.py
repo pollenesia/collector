@@ -33,6 +33,8 @@ THREAD_N = THREAD_LENGTH_MM / THREAD_STEP_MM
 MAX_STEPS = int(512.0 * THREAD_N)
 
 STEP_WAIT = 0.002
+STEP_SIZE = 100
+
 DATA_CALLBACK = {}
 
 
@@ -60,17 +62,11 @@ def is_home() -> bool:
     return gpio.input(PIN_STOP) == False
 
 
-def go_home(din: dict) -> dict:
-    dout = {}
-    motor = din['motor_camera']
+def go_home(motor: rml.BYJMotor):
 
-    if gpio.input(PIN_STOP) == True:
-        logger.info('moving to home')
-        motor.motor_run(PIN_MOTOR1, STEP_WAIT, MAX_STEPS,
+    if not is_home():
+        motor.motor_run(PIN_MOTOR1, STEP_WAIT, STEP_SIZE,
                         BACKWARD, False, "full", 0.05)
-        dout['position_step'] = 0
-    dout['is_home_fixed'] = is_home()
-    return dout
 
 
 def go_end(din: dict) -> dict:
@@ -308,6 +304,7 @@ def main():
 
     mqtt_client.loop_start()
     data['mqtt_client'] = mqtt_client
+    motor_camera = data['motor_camera']
     # mqtt_client.loop_forever()
 
     # test_passing_with_brake()
@@ -374,13 +371,19 @@ def main():
                         i_image += 1
                 elif mode == 'manual':
                     command = data['command']
-                    data['command'] = ''
                     if command == 'go_home':
-                        d = go_home(data)
-                        data.update(d)
+                        go_home(motor_camera)
+                        if is_home():
+                            data['position_step'] = 0
+                            data['is_home_fixed'] = True
+                            data['command'] = ''
+                        else:
+                            data['position_step'] -= STEP_SIZE
+                        send_state(data)
                     elif command == 'go_end':
                         d = go_end(data)
                         data.update(d)
+                        data['command'] = ''
                     elif command == 'get_image':
                         image = get_image(data['camera'])
                         buffer = BytesIO()
@@ -393,11 +396,13 @@ def main():
                     elif command == 'go_steps':
                         d = go_steps(data)
                         data.update(d)
+                        data['command'] = ''
                         data['value'] = 0
                     elif command == 'pass_tape':
                         pass_tape(data['motor_tape'], m_pass_step)
-                    send_state(data)
-                    time.sleep(0.1)
+                        data['command'] = ''
+                    else:
+                        time.sleep(0.1)
             except KeyboardInterrupt:
                 logger.info('exit')
 
