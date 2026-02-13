@@ -33,7 +33,7 @@ THREAD_N = THREAD_LENGTH_MM / THREAD_STEP_MM
 MAX_STEPS = int(512.0 * THREAD_N)
 
 STEP_WAIT = 0.002
-STEP_SIZE = 100
+STEP_SIZE = 1000
 
 DATA_CALLBACK = {}
 
@@ -74,16 +74,28 @@ def leave_home(motor: rml.BYJMotor):
                         FORWARD, False, "full", 0.05)
 
 
-def go_end(din: dict) -> dict:
-    dout = {}
+def go_to(din: dict, position: int) -> int:
     motor = din['motor_camera']
     is_home_fixed = din['is_home_fixed']
-    if is_home_fixed:
-        logger.info('moving to end')
-        motor.motor_run(PIN_MOTOR1, STEP_WAIT, MAX_STEPS,
-                        FORWARD, False, "full", 0.05)
-    dout['position_step'] = MAX_STEPS
-    return dout
+    position_step = din['position_step']
+
+    if not is_home_fixed or position < 0 or position > MAX_STEPS:
+        return 0
+
+    delta = position - position_step
+    delta_abs = abs(delta)
+    step_size_abs = delta_abs if delta_abs < STEP_SIZE else STEP_SIZE
+    if delta >= 0:
+        direction = FORWARD
+        step_size = +step_size_abs
+    else:
+        direction = BACKWARD
+        step_size = -step_size_abs
+
+    motor.motor_run(PIN_MOTOR1, STEP_WAIT, step_size_abs,
+                    direction, False, "full", 0.05)
+
+    return step_size
 
 
 def go_steps(din: dict) -> dict:
@@ -219,27 +231,17 @@ def test_passing_with_brake():
         time.sleep(3.0)
 
 
-def on_message(client, userdata, msg):
-    data = json.loads(msg.payload)
-    logger.info(f"Received `{data}` from `{msg.topic}` topic")
-    command = data['command']
+def on_message(client, userdata: dict, msg):
+    msg_data = json.loads(msg.payload)
+    logger.info(f"Received `{msg_data}` from `{msg.topic}` topic")
+    command = msg_data['command']
     if command == 'release_break':
-        release_break(data['value'])
-    elif command == 'go_home':
-        userdata['command'] = 'go_home'
-    elif command == 'find_home':
-        userdata['command'] = 'find_home'
-    elif command == 'go_end':
-        userdata['command'] = 'go_end'
-    elif command == 'get_image':
-        userdata['command'] = 'get_image'
-    elif command == 'go_steps':
-        userdata['command'] = 'go_steps'
-        userdata['value'] = data['value']
-    elif command == 'pass_tape':
-        userdata['command'] = 'pass_tape'
+        release_break(msg_data['value'])
+    elif command in ['go_home', 'find_home', 'go_end', 'get_image', 'go_steps', 'pass_tape', 'go_to']:
+        userdata['command'] = command
+        userdata['value'] = msg_data.get('value', 0)
     else:
-        logger.warning(f'unknown command {data}')
+        logger.warning(f'unknown command {msg_data}')
 
 
 def init_mqtt(userdata) -> mqtt.Client:
@@ -386,10 +388,13 @@ def main():
                         else:
                             data['position_step'] -= STEP_SIZE
                         send_state(data)
-                    elif command == 'go_end':
-                        d = go_end(data)
-                        data.update(d)
-                        data['command'] = ''
+                    elif command == 'go_to':
+                        step_size = go_to(data, data['value'])
+                        if step_size == 0:
+                            data['command'] = ''
+                        else:
+                            data['position_step'] += step_size
+                        send_state(data)
                     elif command == 'get_image':
                         image = get_image(data['camera'])
                         buffer = BytesIO()
