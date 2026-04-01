@@ -28,7 +28,7 @@ ffplay tcp://rpi1.local:8888 -f rawvideo -fflags nobuffer -pixel_format yuv420p 
 LOG_FORMAT = f"%(asctime)s [%(levelname)s] %(filename)s %(funcName)s(%(lineno)d): %(message)s"
 
 THREAD_STEP_MM = 0.8
-THREAD_LENGTH_MM = 30.0
+THREAD_LENGTH_MM = 8.0
 THREAD_N = THREAD_LENGTH_MM / THREAD_STEP_MM
 MAX_STEPS = int(512.0 * THREAD_N)
 
@@ -74,7 +74,7 @@ def leave_home(motor: rml.BYJMotor):
                         FORWARD, False, "full", 0.05)
 
 
-def go_to(din: dict, position: int) -> int:
+def go_to(din: dict, position: int, step: int = STEP_SIZE) -> int:
     motor = din['motor_camera']
     is_home_fixed = din['is_home_fixed']
     position_step = din['position_step']
@@ -84,7 +84,7 @@ def go_to(din: dict, position: int) -> int:
 
     delta = position - position_step
     delta_abs = abs(delta)
-    step_size_abs = delta_abs if delta_abs < STEP_SIZE else STEP_SIZE
+    step_size_abs = delta_abs if delta_abs < step else step
     if delta >= 0:
         direction = FORWARD
         step_size = +step_size_abs
@@ -170,8 +170,8 @@ def get_sharpness(fname: str):
     return lv
 
 
-def get_data_row(camera: Picamera2, fname: str, dkeys: list[str]):
-    dimage = get_image(camera, fname)
+def get_data_row(camera: Picamera2, fname: str, dkeys: list[str], position_step: int):
+    dimage = get_image_file(camera, fname)
     n = len(dkeys)
     row = np.ndarray(n)
     for i, key in enumerate(dkeys[:-3]):
@@ -316,109 +316,182 @@ def main():
         'FocusFoM', 'Lux', 'Sharpness', 'Position', 'Position_mm',
     ]
 
-    mode = 'manual'
+    # mode = 'manual'
+    mode = 'auto'
     m_step = 100
-    m_pass_step = 100
+    m_pass_step = 64
+
+    # if mode == 'auto':
+    #     data['command'] = 'find_home'
+    #     pass_tape(data['motor_tape'], m_pass_step)
+    #     date = datetime.now()
+    #     dirname = f'{(date.year % 100):02d}{date.month:02d}{date.day:02d}{date.hour:02d}{date.minute:02d}{date.second:02d}'
+    #     logger.info(f'dirname: {dirname}')
+    #     os.makedirs(dirname, exist_ok=True)
+
+    #     if leave_home():
+    #         if go_home():
+    #             pass
+    #         else:
+    #             logger.error('no home')
+    #             exit(-1)
+    #     else:
+    #         logger.error('limit switch stuck')
+    #         exit(-1)
+
+    img_data = np.ndarray((0, len(dkeys)))
+    logger.info(img_data.shape)
+    steps = 0
+    i_image = 0
     while True:
-        if mode == 'auto':
-            pass_tape(64)
-            date = datetime.now()
-            dirname = f'{(date.year % 100):02d}{date.month:02d}{date.day:02d}{date.hour:02d}{date.minute:02d}{date.second:02d}'
-            logger.info(f'dirname: {dirname}')
-            os.makedirs(dirname, exist_ok=True)
-            init_camera()
-
-            if leave_home():
-                if go_home():
-                    pass
-                else:
-                    logger.error('no home')
-                    exit(-1)
-            else:
-                logger.error('limit switch stuck')
-                exit(-1)
-
-        img_data = np.ndarray((0, len(dkeys)))
-        logger.info(img_data.shape)
-        steps = 0
-        i_image = 0
-        while True:
-            try:
-                if mode == 'auto':
-                    position_mm = steps / 512.0 * THREAD_STEP_MM
-                    if position_mm < 15.0:
-                        steps = go_steps(512)
-                    elif position_mm >= 20.0:
-                        logger.info(f'storing {dirname}/data.h5')
-                        f = File(f'{dirname}/data.h5', 'w')
-                        f['data'] = img_data
-                        f['data'].attrs['header'] = dkeys
-                        f.close()
-                        dt = (datetime.now() - date).seconds
-                        sleep_time = 600.0 - dt
-                        logger.info(
-                            f'cycle time is {dt}s, sleep {sleep_time}s')
-                        if sleep_time > 0:
-                            time.sleep(sleep_time)
-                        logger.info('finish')
-                        break
+        try:
+            if mode == 'auto':
+                command = data['command']
+                if command == 'find_home':
+                    leave_home(motor_camera)
+                    if not is_home():
+                        data['is_home_fixed'] = False
+                        data['command'] = 'go_home'
                     else:
-                        steps = go_steps(10)
-                        # time.sleep(0.2)
-                        fname = f'{dirname}/image{i_image:03d}.jpg'
-                        row = get_data_row(data['camera'], fname, dkeys)
+                        data['position_step'] += STEP_SIZE
+                    send_state(data)
+                elif command == 'go_home':
+                    go_home(motor_camera)
+                    if is_home():
+                        data['position_step'] = 0
+                        data['is_home_fixed'] = True
+                        data['command'] = 'pass_tape'
+                    else:
+                        data['position_step'] -= STEP_SIZE
+                    send_state(data)
+                elif command == 'pass_tape':
+                    pass_tape(data['motor_tape'], m_pass_step)
+                    data['command'] = 'go_to'
+                    data['value'] = int(5.0 / THREAD_STEP_MM * 512.0)
+                elif command == 'go_to':
+                    step_size = go_to(data, data['value'])
+                    if step_size == 0:
+                        data['command'] = 'make_dir'
+                    else:
+                        data['position_step'] += step_size
+                    send_state(data)
+                elif command == 'make_dir':
+                    date = datetime.now()
+                    dirname = f'{(date.year % 100):02d}{date.month:02d}{date.day:02d}{date.hour:02d}{date.minute:02d}{date.second:02d}'
+                    logger.info(f'dirname: {dirname}')
+                    os.makedirs(dirname, exist_ok=True)
+                    i_image = 0
+                    data['value'] = int(7.0 / THREAD_STEP_MM * 512.0)
+                    data['command'] = 'make_images'
+                elif command == 'make_images':
+                    step_size = go_to(data, data['value'], 5)
+
+                    if step_size == 0:
+                        data['command'] = 'store_data'
+                    else:
+                        data['position_step'] += step_size
+                        fname = f'{dirname}/image{i_image:03d}.webp'
+                        row = get_data_row(
+                            data['camera'],
+                            fname,
+                            dkeys,
+                            data['position_step']
+                        )
                         img_data = np.vstack((img_data, row))
                         i_image += 1
-                elif mode == 'manual':
-                    command = data['command']
-                    if command == 'find_home':
-                        leave_home(motor_camera)
-                        if not is_home():
-                            data['is_home_fixed'] = False
-                            data['command'] = 'go_home'
-                        else:
-                            data['position_step'] += STEP_SIZE
-                        send_state(data)
-                    elif command == 'go_home':
-                        go_home(motor_camera)
-                        if is_home():
-                            data['position_step'] = 0
-                            data['is_home_fixed'] = True
-                            data['command'] = ''
-                        else:
-                            data['position_step'] -= STEP_SIZE
-                        send_state(data)
-                    elif command == 'go_to':
-                        step_size = go_to(data, data['value'])
-                        if step_size == 0:
-                            data['command'] = ''
-                        else:
-                            data['position_step'] += step_size
-                        send_state(data)
-                    elif command == 'get_image':
-                        image = get_image(data['camera'])
-                        buffer = BytesIO()
-                        image.save(buffer, format='webp')
-                        b = buffer.getvalue()
-                        s = base64.b64encode(b).decode('utf-8')
-                        payload = f'data:image/webp;base64,{s}'
-                        mqtt_client.publish('pollenesia/img', payload=payload)
-                        data['command'] = ''
-                    elif command == 'go_steps':
-                        d = go_steps(data)
-                        data.update(d)
-                        data['command'] = ''
-                        data['value'] = 0
-                    elif command == 'pass_tape':
-                        pass_tape(data['motor_tape'], m_pass_step)
+
+                    send_state(data)
+                elif command == 'store_data':
+                    logger.info(f'storing {dirname}/data.h5')
+                    f = File(f'{dirname}/data.h5', 'w')
+                    f['data'] = img_data
+                    f['data'].attrs['header'] = dkeys
+                    f.close()
+                    dt = (datetime.now() - date).seconds
+                    sleep_time = 900.0 - dt
+                    logger.info(f'cycle time is {dt}s, sleep {sleep_time}s')
+                    if sleep_time > 0:
+                        time.sleep(sleep_time)
+                    logger.info('finish')
+
+                    data['command'] = ''
+                else:
+                    data['command'] = 'find_home'
+                    send_state(data)
+                    time.sleep(0.2)
+
+                # position_mm = steps / 512.0 * THREAD_STEP_MM
+                # if position_mm < 15.0:
+                #     steps = go_steps(512)
+                # elif position_mm >= 20.0:
+                #     logger.info(f'storing {dirname}/data.h5')
+                #     f = File(f'{dirname}/data.h5', 'w')
+                #     f['data'] = img_data
+                #     f['data'].attrs['header'] = dkeys
+                #     f.close()
+                #     dt = (datetime.now() - date).seconds
+                #     sleep_time = 600.0 - dt
+                #     logger.info(
+                #         f'cycle time is {dt}s, sleep {sleep_time}s')
+                #     if sleep_time > 0:
+                #         time.sleep(sleep_time)
+                #     logger.info('finish')
+                #     break
+                # else:
+                #     steps = go_steps(10)
+                #     # time.sleep(0.2)
+                #     fname = f'{dirname}/image{i_image:03d}.jpg'
+                #     row = get_data_row(data['camera'], fname, dkeys)
+                #     img_data = np.vstack((img_data, row))
+                #     i_image += 1
+            elif mode == 'manual':
+                command = data['command']
+                if command == 'find_home':
+                    leave_home(motor_camera)
+                    if not is_home():
+                        data['is_home_fixed'] = False
+                        data['command'] = 'go_home'
+                    else:
+                        data['position_step'] += STEP_SIZE
+                    send_state(data)
+                elif command == 'go_home':
+                    go_home(motor_camera)
+                    if is_home():
+                        data['position_step'] = 0
+                        data['is_home_fixed'] = True
                         data['command'] = ''
                     else:
-                        send_state(data)
-                        time.sleep(0.2)
-            except KeyboardInterrupt:
-                logger.info('exit')
-
-        exit(0)
+                        data['position_step'] -= STEP_SIZE
+                    send_state(data)
+                elif command == 'go_to':
+                    step_size = go_to(data, data['value'])
+                    if step_size == 0:
+                        data['command'] = ''
+                    else:
+                        data['position_step'] += step_size
+                    send_state(data)
+                elif command == 'get_image':
+                    image = get_image(data['camera'])
+                    buffer = BytesIO()
+                    image.save(buffer, format='webp')
+                    b = buffer.getvalue()
+                    s = base64.b64encode(b).decode('utf-8')
+                    payload = f'data:image/webp;base64,{s}'
+                    mqtt_client.publish('pollenesia/img', payload=payload)
+                    data['command'] = ''
+                elif command == 'go_steps':
+                    d = go_steps(data)
+                    data.update(d)
+                    data['command'] = ''
+                    data['value'] = 0
+                elif command == 'pass_tape':
+                    pass_tape(data['motor_tape'], m_pass_step)
+                    data['command'] = ''
+                else:
+                    send_state(data)
+                    time.sleep(0.2)
+        except KeyboardInterrupt:
+            logger.info('exit')
 
 
 if __name__ == '__main__':
