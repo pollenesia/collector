@@ -380,14 +380,16 @@ def main():
 
                     send_state(data)
                 elif command == 'store_data':
-                    logger.info(f'storing {dirname}/data.h5')
-                    f = File(f'{dirname}/data.h5', 'w')
+                    fname = os.path.join(dirname, 'data.h5')
+                    logger.info(f'storing {fname}')
+                    f = File(fname, 'w')
                     f['data'] = img_data
                     f['data'].attrs['header'] = dkeys
                     f.close()
                     img_data = np.ndarray((0, len(dkeys)))
-                    sys.argv.clear()
-                    sys.argv.append(dirname)
+                    # sys.argv.clear()
+                    sys.argv = sys.argv[0:1]
+                    sys.argv.append(fname)
                     pp.main()
                     dt = (datetime.now() - date).seconds
                     sleep_time = cycle_time_s - dt
