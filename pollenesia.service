@@ -1,0 +1,18 @@
+# systemctl daemon-reload
+# systemctl enable --now pollenesia.service
+
+[Unit]
+Description=Pollenesia
+After=network.target
+StartLimitBurst=3
+StartLimitIntervalSec=60
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/pollenesia-run
+Restart=on-failure
+RestartSec=5
+Environment=PATH=%h/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+
+[Install]
+WantedBy=multi-user.target
