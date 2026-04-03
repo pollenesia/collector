@@ -7,7 +7,9 @@ import logging
 import numpy as np
 import os
 import paho.mqtt.client as mqtt
+import pollenesia.postprocessing as pp
 import RPi.GPIO as gpio
+import sys
 import time
 
 from datetime import datetime
@@ -280,13 +282,8 @@ def send_state(data: dict):
 
 def main():
     parser = argparse.ArgumentParser()
-    # parser.add_argument(
-    #     'host',
-    #     default='localhost',
-    #     help='MQTT host',
-    #     type=str
-    # )
-    parser.add_argument('--output', help='output dir', default='.', type=str)
+    parser.add_argument('-o', '--output', help='output dir',
+                        default='/var/log/pollenesia/data', type=str)
 
     try:
         options, _ = parser.parse_known_args()
@@ -295,13 +292,10 @@ def main():
         logger.error(e)
         exit(0)
 
-    options.output = os.path.expanduser(options.output)
-    if not os.path.exists(options.output):
-        os.makedirs(options.output)
-
-    basedirname = '/tmp/pollenesia'
+    basedirname = os.path.expanduser(options.output)
     if not os.path.exists(basedirname):
         os.makedirs(basedirname)
+
     cycle_time_s = 900.0
 
     data = init()
@@ -392,6 +386,9 @@ def main():
                     f['data'].attrs['header'] = dkeys
                     f.close()
                     img_data = np.ndarray((0, len(dkeys)))
+                    sys.argv.clear()
+                    sys.argv.append(dirname)
+                    pp.main()
                     dt = (datetime.now() - date).seconds
                     sleep_time = cycle_time_s - dt
                     logger.info(f'cycle time is {dt}s, sleep {sleep_time}s')

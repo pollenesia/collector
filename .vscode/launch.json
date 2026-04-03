@@ -11,6 +11,17 @@
             "module": "pollenesia.collector",
             "console": "integratedTerminal",
             "args": []
+        },
+        {
+            "name": "postprocessing",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pollenesia.postprocessing",
+            "console": "integratedTerminal",
+            "args": [
+                // "~/tmp/0/**/data.h5"
+                "~/tmp/1/**/data.h5"
+            ]
         }
     ]
 }
