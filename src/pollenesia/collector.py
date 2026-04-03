@@ -296,7 +296,7 @@ def main():
     if not os.path.exists(basedirname):
         os.makedirs(basedirname)
 
-    cycle_time_s = 900.0
+    cycle_time_s = 1800.0
 
     data = init()
     mqtt_client = init_mqtt(data)
@@ -315,6 +315,7 @@ def main():
     mode = 'auto'
     m_step = 100
     m_pass_step = 32
+    image_shot_step = 3
 
     img_data = np.ndarray((0, len(dkeys)))
     logger.info(img_data.shape)
@@ -362,7 +363,7 @@ def main():
                     data['value'] = int(7.0 / THREAD_STEP_MM * 512.0)
                     data['command'] = 'make_images'
                 elif command == 'make_images':
-                    step_size = go_to(data, data['value'], 5)
+                    step_size = go_to(data, data['value'], image_shot_step)
 
                     if step_size == 0:
                         data['command'] = 'store_data'
@@ -387,7 +388,6 @@ def main():
                     f['data'].attrs['header'] = dkeys
                     f.close()
                     img_data = np.ndarray((0, len(dkeys)))
-                    # sys.argv.clear()
                     sys.argv = sys.argv[0:1]
                     sys.argv.append(fname)
                     pp.main()
