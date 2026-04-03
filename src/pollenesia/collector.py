@@ -299,6 +299,11 @@ def main():
     if not os.path.exists(options.output):
         os.makedirs(options.output)
 
+    basedirname = '/tmp/pollenesia'
+    if not os.path.exists(basedirname):
+        os.makedirs(basedirname)
+    cycle_time_s = 900.0
+
     data = init()
     mqtt_client = init_mqtt(data)
 
@@ -315,7 +320,7 @@ def main():
     # mode = 'manual'
     mode = 'auto'
     m_step = 100
-    m_pass_step = 64
+    m_pass_step = 32
 
     img_data = np.ndarray((0, len(dkeys)))
     logger.info(img_data.shape)
@@ -356,6 +361,7 @@ def main():
                 elif command == 'make_dir':
                     date = datetime.now()
                     dirname = f'{(date.year % 100):02d}{date.month:02d}{date.day:02d}{date.hour:02d}{date.minute:02d}{date.second:02d}'
+                    dirname = os.path.join(basedirname, dirname)
                     logger.info(f'dirname: {dirname}')
                     os.makedirs(dirname, exist_ok=True)
                     i_image = 0
@@ -387,7 +393,7 @@ def main():
                     f.close()
                     img_data = np.ndarray((0, len(dkeys)))
                     dt = (datetime.now() - date).seconds
-                    sleep_time = 900.0 - dt
+                    sleep_time = cycle_time_s - dt
                     logger.info(f'cycle time is {dt}s, sleep {sleep_time}s')
                     if sleep_time > 0:
                         time.sleep(sleep_time)

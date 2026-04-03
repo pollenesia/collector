@@ -10,7 +10,9 @@
             "args": [
                 "-m",
                 "build",
-                "."
+                ".",
+                "--wheel",
+                "--no-isolation"
             ],
             "group": {
                 "kind": "build",
