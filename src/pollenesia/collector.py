@@ -307,10 +307,6 @@ def main():
     motor_camera = data['motor_camera']
     # mqtt_client.loop_forever()
 
-    # test_passing_with_brake()
-    # is_home = True
-    # go_end()
-
     dkeys = [
         'SensorTimestamp', 'ExposureTime',
         'FocusFoM', 'Lux', 'Sharpness', 'Position', 'Position_mm',
@@ -320,24 +316,6 @@ def main():
     mode = 'auto'
     m_step = 100
     m_pass_step = 64
-
-    # if mode == 'auto':
-    #     data['command'] = 'find_home'
-    #     pass_tape(data['motor_tape'], m_pass_step)
-    #     date = datetime.now()
-    #     dirname = f'{(date.year % 100):02d}{date.month:02d}{date.day:02d}{date.hour:02d}{date.minute:02d}{date.second:02d}'
-    #     logger.info(f'dirname: {dirname}')
-    #     os.makedirs(dirname, exist_ok=True)
-
-    #     if leave_home():
-    #         if go_home():
-    #             pass
-    #         else:
-    #             logger.error('no home')
-    #             exit(-1)
-    #     else:
-    #         logger.error('limit switch stuck')
-    #         exit(-1)
 
     img_data = np.ndarray((0, len(dkeys)))
     logger.info(img_data.shape)
@@ -407,6 +385,7 @@ def main():
                     f['data'] = img_data
                     f['data'].attrs['header'] = dkeys
                     f.close()
+                    img_data = np.ndarray((0, len(dkeys)))
                     dt = (datetime.now() - date).seconds
                     sleep_time = 900.0 - dt
                     logger.info(f'cycle time is {dt}s, sleep {sleep_time}s')
@@ -419,31 +398,6 @@ def main():
                     data['command'] = 'find_home'
                     send_state(data)
                     time.sleep(0.2)
-
-                # position_mm = steps / 512.0 * THREAD_STEP_MM
-                # if position_mm < 15.0:
-                #     steps = go_steps(512)
-                # elif position_mm >= 20.0:
-                #     logger.info(f'storing {dirname}/data.h5')
-                #     f = File(f'{dirname}/data.h5', 'w')
-                #     f['data'] = img_data
-                #     f['data'].attrs['header'] = dkeys
-                #     f.close()
-                #     dt = (datetime.now() - date).seconds
-                #     sleep_time = 600.0 - dt
-                #     logger.info(
-                #         f'cycle time is {dt}s, sleep {sleep_time}s')
-                #     if sleep_time > 0:
-                #         time.sleep(sleep_time)
-                #     logger.info('finish')
-                #     break
-                # else:
-                #     steps = go_steps(10)
-                #     # time.sleep(0.2)
-                #     fname = f'{dirname}/image{i_image:03d}.jpg'
-                #     row = get_data_row(data['camera'], fname, dkeys)
-                #     img_data = np.vstack((img_data, row))
-                #     i_image += 1
             elif mode == 'manual':
                 command = data['command']
                 if command == 'find_home':
