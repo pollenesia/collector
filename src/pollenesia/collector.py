@@ -191,12 +191,18 @@ def release_break(release: bool):
 
 
 def pass_tape(motor: rml.BYJMotor, range: int):
+    pretension = 64
     release_break(True)
+    motor.motor_run(PIN_MOTOR2, 0.01, pretension,
+                    BACKWARD, False, 'full', 0.05)
+    time.sleep(1.0)
     logger.info(f'passing tape to {range} steps')
     motor.motor_run(PIN_MOTOR2, 0.01, range,
                     FORWARD, False, 'full', 0.05)
-    logger.info('tape passed')
     release_break(False)
+    motor.motor_run(PIN_MOTOR2, 0.01, pretension*2,
+                    FORWARD, False, 'full', 0.05)
+    logger.info('tape passed')
 
 
 def init() -> dict:
@@ -313,14 +319,13 @@ def main():
 
     # mode = 'manual'
     mode = 'auto'
-    m_step = 100
     m_pass_step = 32
     image_shot_step = 3
 
     img_data = np.ndarray((0, len(dkeys)))
-    logger.info(img_data.shape)
-    steps = 0
     i_image = 0
+    date0 = datetime.now()
+
     while True:
         try:
             if mode == 'auto':
@@ -345,7 +350,7 @@ def main():
                 elif command == 'pass_tape':
                     pass_tape(data['motor_tape'], m_pass_step)
                     data['command'] = 'go_to'
-                    data['value'] = int(5.0 / THREAD_STEP_MM * 512.0)
+                    data['value'] = int(6.0 / THREAD_STEP_MM * 512.0)
                 elif command == 'go_to':
                     step_size = go_to(data, data['value'])
                     if step_size == 0:
@@ -360,7 +365,7 @@ def main():
                     logger.info(f'dirname: {dirname}')
                     os.makedirs(dirname, exist_ok=True)
                     i_image = 0
-                    data['value'] = int(7.0 / THREAD_STEP_MM * 512.0)
+                    data['value'] = int(8.0 / THREAD_STEP_MM * 512.0)
                     data['command'] = 'make_images'
                 elif command == 'make_images':
                     step_size = go_to(data, data['value'], image_shot_step)
@@ -391,7 +396,8 @@ def main():
                     sys.argv = sys.argv[0:1]
                     sys.argv.append(fname)
                     pp.main()
-                    dt = (datetime.now() - date).seconds
+                    dt = (datetime.now() - date0).seconds
+                    date0 = datetime.now()
                     sleep_time = cycle_time_s - dt
                     logger.info(f'cycle time is {dt}s, sleep {sleep_time}s')
                     if sleep_time > 0:

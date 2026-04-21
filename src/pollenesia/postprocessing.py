@@ -69,11 +69,12 @@ def main():
         image_list.append(image)
 
     copy_images(image_list, odir)
-    dirname = os.path.dirname(pattern)
-    flist = get_file_list(dirname, recursive=True)
-    for d in flist:
-        if os.path.isdir(d):
-            remove_images(d)
+    if False:
+        dirname = os.path.dirname(pattern)
+        flist = get_file_list(dirname, recursive=True)
+        for d in flist:
+            if os.path.isdir(d):
+                remove_images(d)
 
 
 if __name__ == '__main__':
