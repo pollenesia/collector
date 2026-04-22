@@ -397,11 +397,11 @@ def main():
                     sys.argv.append(fname)
                     pp.main()
                     dt = (datetime.now() - date0).seconds
-                    date0 = datetime.now()
                     sleep_time = cycle_time_s - dt
                     logger.info(f'cycle time is {dt}s, sleep {sleep_time}s')
                     if sleep_time > 0:
                         time.sleep(sleep_time)
+                    date0 = datetime.now()
                     logger.info('finish')
 
                     data['command'] = ''
