@@ -3,6 +3,7 @@ from h5py import File, Group, Dataset
 from matplotlib import pyplot
 from scipy.constants import speed_of_light
 from pollenesia.utils import get_logger, get_file_list
+from scipy.signal import find_peaks
 
 import argparse
 import numpy as np
@@ -19,7 +20,20 @@ def get_image_fname(fname: str):
     header = list(f['data'].attrs['header'])
     header: list
     i_sharpness = header.index('Sharpness')
-    i_max_sharpness = np.argmax(d[:, i_sharpness])
+    sharpness = d[:, i_sharpness]
+
+    mean = np.mean(sharpness)
+    mad = np.median(np.abs(sharpness - mean))
+    threshold = mean + mad * 6
+    i_peaks, _ = find_peaks(sharpness, height=threshold)
+
+    if len(i_peaks) > 0:
+        i_max_sharpness = np.min(i_peaks)
+    else:
+        i_max_sharpness = np.argmax(sharpness)
+    info = f'mean={mean:.2f}, mad={mad:.2f}, threshold={threshold:.2f}, i_max_sharpness={i_max_sharpness}'
+    logger.info(info)
+
     image_fname = f'image{i_max_sharpness:03d}.webp'
     image_path = os.path.join(path, image_fname)
     logger.info(image_path)
