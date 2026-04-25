@@ -83,7 +83,7 @@ def main():
         image_list.append(image)
 
     copy_images(image_list, odir)
-    if False:
+    if True:
         dirname = os.path.dirname(pattern)
         flist = get_file_list(dirname, recursive=True)
         for d in flist:

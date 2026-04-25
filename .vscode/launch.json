@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "test2",
+            "name": "collector",
             "type": "debugpy",
             "request": "launch",
             "module": "pollenesia.collector",
@@ -39,6 +39,16 @@
             "type": "debugpy",
             "request": "launch",
             "module": "pollenesia.db",
+            "console": "integratedTerminal",
+            "args": [
+                "~/tmp/1/filtered/*.webp"
+            ]
+        },
+        {
+            "name": "test1",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "tests/test1.py",
             "console": "integratedTerminal",
             "args": [
                 "~/tmp/1/filtered/*.webp"
