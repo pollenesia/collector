@@ -22,6 +22,27 @@
                 // "~/tmp/0/**/data.h5"
                 "~/tmp/1/**/data.h5"
             ]
+        },
+        {
+            "name": "contours",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pollenesia.contours",
+            "console": "integratedTerminal",
+            "args": [
+                "~/tmp/1/filtered/*.webp"
+                // "~/tmp/1/filtered/260405213937.webp"
+            ]
+        },
+        {
+            "name": "db",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pollenesia.db",
+            "console": "integratedTerminal",
+            "args": [
+                "~/tmp/1/filtered/*.webp"
+            ]
         }
     ]
 }

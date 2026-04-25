@@ -4,7 +4,7 @@ import argparse
 import os
 
 from matplotlib import pyplot as plt
-from utils import get_logger, get_file_list
+from pollenesia.utils import get_logger, get_file_list
 
 logger = get_logger(__name__)
 
@@ -13,23 +13,23 @@ def load_image(fname: str):
     # 'data/filtered/250809142446.jpg'
     img = cv2.imread(fname)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    gray = cv2.bitwise_not(gray)
+    # gray = cv2.bitwise_not(gray)
 
     window = gray.shape[0] // 11 - 1
     window += (window - 1) % 2
-    threshold = 60
+    threshold = 12
     threshold_brightness = threshold * 0.8
 
     background = cv2.GaussianBlur(gray, (window, window), 0)
     gray = cv2.subtract(gray, background)
 
-    idx = gray < 24
+    idx = gray < 4
     gray[idx] = np.mean(gray)
     # cv2.imshow('Prepared', gray)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
 
-    gray = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
+    # gray = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
 
     _, thresh = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
 
@@ -46,10 +46,19 @@ def load_image(fname: str):
         ratio = max(w / h, h / w)
         roi = gray[y:y+h, x:x+w]
         brightness = np.mean(roi)
+        croi = img[y:y+h, x:x+w]
+        color = np.mean(croi, axis=(0, 1))
+        color /= np.max(color)
         b = np.vstack((b, [area, brightness]))
-        if area >= 4 and area < 1000 and brightness > threshold_brightness and ratio < 3:
-            n_particles += 1
-            cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 1)
+        if area >= 4 and area < 10000 and brightness > threshold_brightness and ratio < 4:
+            # n_particles += 1
+            clr = np.clip(color * 255, 0, 255).astype(np.uint8)
+            clr = tuple(int(x) for x in clr)
+            if clr[2] - clr[1] > 64 and clr[2] - clr[0] > 64:
+                clr = (0, 0, 255)
+                n_particles += 1
+            # cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 1)
+            cv2.rectangle(img, (x, y), (x+w, y+h), clr, 1)
 
     logger.info(f'Particle Number: {n_particles}')
     logger.info(f'Particle Shape: {b.shape}')
@@ -77,7 +86,7 @@ def load_image(fname: str):
     cv2.imwrite(ofname, img)
 
     # images = np.hstack((gray_color, img))
-    # cv2.imshow('Prepared', img)
+    # cv2.imshow('Prepared', images)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
 
