@@ -302,7 +302,7 @@ def main():
     if not os.path.exists(basedirname):
         os.makedirs(basedirname)
 
-    cycle_time_s = 1800.0
+    cycle_time_s = 900.0
 
     data = init()
     mqtt_client = init_mqtt(data)
@@ -319,7 +319,7 @@ def main():
 
     # mode = 'manual'
     mode = 'auto'
-    m_pass_step = 32
+    m_pass_step = 16
     image_shot_step = 3
 
     img_data = np.ndarray((0, len(dkeys)))

@@ -19,7 +19,7 @@ def get_image_fname(fname: str):
     d = f['data']
     header = list(f['data'].attrs['header'])
     header: list
-    i_sharpness = header.index('Sharpness')
+    i_sharpness = header.index('FocusFoM')
     sharpness = d[:, i_sharpness]
 
     mean = np.mean(sharpness)
@@ -31,7 +31,11 @@ def get_image_fname(fname: str):
         i_max_sharpness = np.min(i_peaks)
     else:
         i_max_sharpness = np.argmax(sharpness)
-    info = f'mean={mean:.2f}, mad={mad:.2f}, threshold={threshold:.2f}, i_max_sharpness={i_max_sharpness}'
+    i_range_mm = header.index('Position_mm')
+    range_mm = d[i_max_sharpness, i_range_mm]
+    info = f'mean={mean:.2f}, mad={mad:.2f}, threshold={threshold:.2f}'
+    logger.info(info)
+    info = f'i_max_sharpness={i_max_sharpness}, range_mm={range_mm:.2f}'
     logger.info(info)
 
     image_fname = f'image{i_max_sharpness:03d}.webp'
