@@ -8,7 +8,7 @@ from scipy.signal import find_peaks
 
 logger = get_logger(__name__)
 
-fname = '~/tmp/2/data.h5'
+fname = '~/tmp/0/**/data.h5'
 fname = os.path.expanduser(fname)
 flist = get_file_list(fname)
 
@@ -20,7 +20,6 @@ for fname in flist:
     i_sharpness = header.index('FocusFoM')
     sharpness = d[:, i_sharpness]
 
-    # sharpness = d[:, 2]
     mean = np.mean(sharpness)
     mad = np.median(np.abs(sharpness - mean))
     threshold = mean + mad * 6
@@ -31,19 +30,20 @@ for fname in flist:
     else:
         i_max_sharpness = np.argmax(sharpness)
 
-    i_range_mm = header.index('Position_mm')
-    range_mm = d[i_max_sharpness, i_range_mm]
-    info = f'mean={mean:.2f}, mad={mad:.2f}, threshold={threshold:.2f}'
-    logger.info(info)
-    info = f'i_max_sharpness={i_max_sharpness}, range_mm={range_mm:.2f}'
-    logger.info(info)
+    # i_range_mm = header.index('Position_mm')
+    # range_mm = d[i_max_sharpness, i_range_mm]
+    # info = f'mean={mean:.2f}, mad={mad:.2f}, threshold={threshold:.2f}'
+    # logger.info(info)
+    # info = f'i_max_sharpness={i_max_sharpness}, range_mm={range_mm:.2f}'
+    # logger.info(info)
 
     path = os.path.dirname(fname)
     image_fname = f'image{i_max_sharpness:03d}.webp'
     image_path = os.path.join(path, image_fname)
-    print(image_path)
+    new_path = f'{os.path.basename(path)}.webp'
+    print(image_path, new_path)
 
-    if True:
+    if False:
         fig, ax1 = plt.subplots(1, 1)
         fig.set_size_inches(16, 9)
         fig.set_tight_layout(True)

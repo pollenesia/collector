@@ -9,8 +9,18 @@ from pollenesia.utils import get_logger, get_file_list
 logger = get_logger(__name__)
 
 
+def contours_intersect(cnt1, cnt2):
+    """Check if two contours intersect by comparing all edge points"""
+    x1, y1, w1, h1 = cv2.boundingRect(cnt1)
+    x2, y2, w2, h2 = cv2.boundingRect(cnt2)
+
+    if x1 + w1 < x2 or x2 + w2 < x1 or y1 + h1 < y2 or y2 + h2 < y1:
+        return False
+
+    return True
+
+
 def load_image(fname: str):
-    # 'data/filtered/250809142446.jpg'
     img = cv2.imread(fname)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # gray = cv2.bitwise_not(gray)
@@ -34,13 +44,30 @@ def load_image(fname: str):
     _, thresh = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
 
     contours, _ = cv2.findContours(
-        thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        thresh,
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE
+    )
 
-    n_particles = 0
-    b = np.ndarray((0, 2))
-    gray_color = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+    contours = sorted(contours, key=cv2.contourArea, reverse=True)
+
+    filtered_contours = []
 
     for cnt in contours:
+        overlaps = False
+        for filtered_cnt in filtered_contours:
+            if contours_intersect(cnt, filtered_cnt):
+                overlaps = True
+                break
+
+        if not overlaps:
+            filtered_contours.append(cnt)
+
+    n_particles = 0
+    n_red = 0
+    b = np.ndarray((0, 2))
+
+    for cnt in filtered_contours:
         area = cv2.contourArea(cnt)
         x, y, w, h = cv2.boundingRect(cnt)
         ratio = max(w / h, h / w)
@@ -51,17 +78,16 @@ def load_image(fname: str):
         color /= np.max(color)
         b = np.vstack((b, [area, brightness]))
         if area >= 4 and area < 10000 and brightness > threshold_brightness and ratio < 4:
-            # n_particles += 1
+            n_particles += 1
             clr = np.clip(color * 255, 0, 255).astype(np.uint8)
             clr = tuple(int(x) for x in clr)
             if clr[2] - clr[1] > 64 and clr[2] - clr[0] > 64:
                 clr = (0, 0, 255)
-                n_particles += 1
-            # cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 1)
+                n_red += 1
             cv2.rectangle(img, (x, y), (x+w, y+h), clr, 1)
 
     logger.info(f'Particle Number: {n_particles}')
-    logger.info(f'Particle Shape: {b.shape}')
+    logger.info(f'Red Particles: {n_red}')
 
     # fig, ax = plt.subplots(1, 1)
     # ax.scatter(b[:, 0], b[:, 1])
@@ -73,10 +99,18 @@ def load_image(fname: str):
     # fig.set_tight_layout(True)
     # plt.show()
 
-    font = cv2.FONT_HERSHEY_DUPLEX
-    # text,coordinate,font,size of text,color,thickness of font
-    label = f'Particle Number: {n_particles:2d}'
-    cv2.putText(img, label, (32, 32), font, 1, (0, 255, 255), 1)
+    # font = cv2.FONT_HERSHEY_DUPLEX
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 1.0
+    font_weight = 1
+    text_color = (0, 255, 255)
+
+    label = f'Particles: {n_particles:3d}'
+    cv2.putText(img, label, (32, 32), font,
+                font_scale, text_color, font_weight)
+    label = f'Red: {n_red:3d}'
+    cv2.putText(img, label, (32, 64), font,
+                font_scale, text_color, font_weight)
 
     ofname = os.path.basename(fname)
     dirname = os.path.dirname(fname)
@@ -85,12 +119,13 @@ def load_image(fname: str):
     ofname = os.path.relpath(ofname)
     cv2.imwrite(ofname, img)
 
+    # gray_color = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
     # images = np.hstack((gray_color, img))
     # cv2.imshow('Prepared', images)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
 
-    return n_particles
+    return n_particles, n_red
 
 
 def main():
@@ -108,20 +143,28 @@ def main():
     flist = get_file_list(pattern, recursive=True)
 
     n_particles = []
+    n_red = []
     for fname in flist:
         logger.info(fname)
-        n = load_image(fname)
+        n, r = load_image(fname)
         n_particles.append(n)
+        n_red.append(r)
 
     n_particles = np.array(n_particles)
+    n_red = np.array(n_red)
     t = np.arange(n_particles.shape[0]) * 600.0 / 3600.0
-    fig, ax = plt.subplots(1, 1)
-    ax.plot(t, n_particles, '.-')
+    fig, (ax, ax2) = plt.subplots(2, 1)
+    ax.plot(t, n_particles, '.-', color='tab:blue')
+    ax2.plot(t, n_red, '.-', color='tab:orange')
     ax.grid()
+    ax2.grid()
     ax.set_xlabel('Hours')
-    ax.set_ylabel('Particle Number')
+    ax2.set_xlabel('Hours')
+    ax.set_ylabel('Particles')
+    ax2.set_ylabel('Red Particles')
     # ax.set_xlim(0, t[-1])
-    ax.set_xlim(0)
+    ax.set_xlim(0, t[-1])
+    ax2.set_xlim(0, t[-1])
     fig.set_size_inches(16, 4.5)
     fig.set_tight_layout(True)
     plt.show()

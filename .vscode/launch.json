@@ -30,8 +30,9 @@
             "module": "pollenesia.contours",
             "console": "integratedTerminal",
             "args": [
-                "~/tmp/1/filtered/*.webp"
-                // "~/tmp/1/filtered/260405213937.webp"
+                // "~/tmp/0_pollenesia/filtered/*.webp"
+                // "~/tmp/0_pollenesia/filtered/260501200723.webp"
+                "~/tmp/0_pollenesia/filtered/26050*.webp"
             ]
         },
         {
@@ -41,7 +42,8 @@
             "module": "pollenesia.db",
             "console": "integratedTerminal",
             "args": [
-                "~/tmp/1/filtered/*.webp"
+                "~/tmp/0_pollenesia/filtered/26050*.webp"
+                // "~/tmp/0_pollenesia/filtered/*.webp"
             ]
         },
         {
