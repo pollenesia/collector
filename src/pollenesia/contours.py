@@ -65,6 +65,7 @@ def load_image(fname: str):
 
     n_particles = 0
     n_red = 0
+    n_yellow = 0
     b = np.ndarray((0, 2))
 
     for cnt in filtered_contours:
@@ -84,10 +85,14 @@ def load_image(fname: str):
             if clr[2] - clr[1] > 64 and clr[2] - clr[0] > 64:
                 clr = (0, 0, 255)
                 n_red += 1
+            elif (clr[1] + clr[2])/2 - clr[0] > 64 and abs(clr[1] - clr[2]) < 32:
+                clr = (0, 255, 255)
+                n_yellow += 1
             cv2.rectangle(img, (x, y), (x+w, y+h), clr, 1)
 
     logger.info(f'Particle Number: {n_particles}')
     logger.info(f'Red Particles: {n_red}')
+    logger.info(f'Yellow Particles: {n_yellow}')
 
     # fig, ax = plt.subplots(1, 1)
     # ax.scatter(b[:, 0], b[:, 1])
@@ -111,6 +116,9 @@ def load_image(fname: str):
     label = f'Red: {n_red:3d}'
     cv2.putText(img, label, (32, 64), font,
                 font_scale, text_color, font_weight)
+    label = f'Yellow: {n_yellow:3d}'
+    cv2.putText(img, label, (32, 96), font,
+                font_scale, text_color, font_weight)
 
     ofname = os.path.basename(fname)
     dirname = os.path.dirname(fname)
@@ -119,13 +127,14 @@ def load_image(fname: str):
     ofname = os.path.relpath(ofname)
     cv2.imwrite(ofname, img)
 
-    # gray_color = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-    # images = np.hstack((gray_color, img))
-    # cv2.imshow('Prepared', images)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
+    if False:
+        gray_color = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+        images = np.hstack((gray_color, img))
+        cv2.imshow('Prepared', images)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
-    return n_particles, n_red
+    return n_particles, n_red, n_yellow
 
 
 def main():
@@ -144,27 +153,35 @@ def main():
 
     n_particles = []
     n_red = []
+    n_yellow = []
     for fname in flist:
         logger.info(fname)
-        n, r = load_image(fname)
+        n, r, y = load_image(fname)
         n_particles.append(n)
         n_red.append(r)
+        n_yellow.append(y)
 
     n_particles = np.array(n_particles)
     n_red = np.array(n_red)
+    n_yellow = np.array(n_yellow)
     t = np.arange(n_particles.shape[0]) * 600.0 / 3600.0
-    fig, (ax, ax2) = plt.subplots(2, 1)
+    fig, (ax, ax2, ax3) = plt.subplots(3, 1)
     ax.plot(t, n_particles, '.-', color='tab:blue')
-    ax2.plot(t, n_red, '.-', color='tab:orange')
+    ax2.plot(t, n_red, '.-', color='tab:red')
+    ax3.plot(t, n_yellow, '.-', color='tab:orange')
     ax.grid()
     ax2.grid()
+    ax3.grid()
     ax.set_xlabel('Hours')
     ax2.set_xlabel('Hours')
+    ax3.set_xlabel('Hours')
     ax.set_ylabel('Particles')
     ax2.set_ylabel('Red Particles')
+    ax3.set_ylabel('Yellow Particles')
     # ax.set_xlim(0, t[-1])
     ax.set_xlim(0, t[-1])
     ax2.set_xlim(0, t[-1])
+    ax3.set_xlim(0, t[-1])
     fig.set_size_inches(16, 4.5)
     fig.set_tight_layout(True)
     plt.show()

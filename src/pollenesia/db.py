@@ -10,7 +10,6 @@ from pollenesia.contours import load_image
 
 logger = get_logger(__name__)
 
-# Database connection parameters
 DB_NAME = 'pollenesia'
 DB_USER = 'pollenesia'
 DB_PASS = 'pollenesia'
@@ -21,7 +20,6 @@ conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
                         password=DB_PASS, host=DB_HOST, port=DB_PORT)
 cursor = conn.cursor()
 
-# Create table if it doesn't exist
 create_table_query = '''
 CREATE TABLE IF NOT EXISTS images (
     timestamp BIGINT PRIMARY KEY,
@@ -35,7 +33,8 @@ create_table_metrics = '''
 CREATE TABLE IF NOT EXISTS metrics (
     timestamp BIGINT PRIMARY KEY,
     n_particles INTEGER NOT NULL,
-    n_red INTEGER NOT NULL
+    n_red INTEGER NOT NULL,
+    n_yellow INTEGER NOT NULL
 );
 '''
 cursor.execute(create_table_metrics)
@@ -49,12 +48,12 @@ def insert_data(timestamp, image_data):
     cursor.execute(insert_query, (timestamp, image_data))
 
 
-def insert_metrics(timestamp, n_particles, n_red):
+def insert_metrics(timestamp, n_particles, n_red, n_yellow):
     insert_query = '''
-        INSERT INTO metrics (timestamp, n_particles, n_red) VALUES (%s, %s, %s)
-        ON CONFLICT (timestamp) DO UPDATE SET n_particles = EXCLUDED.n_particles, n_red = EXCLUDED.n_red;
+        INSERT INTO metrics (timestamp, n_particles, n_red, n_yellow) VALUES (%s, %s, %s, %s)
+        ON CONFLICT (timestamp) DO UPDATE SET n_particles = EXCLUDED.n_particles, n_red = EXCLUDED.n_red, n_yellow = EXCLUDED.n_yellow;
     '''
-    cursor.execute(insert_query, (timestamp, n_particles, n_red))
+    cursor.execute(insert_query, (timestamp, n_particles, n_red, n_yellow))
 
 
 def basename2unixtime(basename: str) -> int:
@@ -62,7 +61,7 @@ def basename2unixtime(basename: str) -> int:
     return int(ts.timestamp())
 
 
-pattern = '~/tmp/0_pollenesia/filtered/*.webp'
+pattern = '~/tmp/0_pollenesia/filtered/260507*.webp'
 pattern = os.path.expanduser(pattern)
 
 flist = get_file_list(pattern)
@@ -72,8 +71,8 @@ for fname in flist:
     basename = os.path.splitext(basename)[0]
     timestamp = basename2unixtime(basename)
 
-    n_particles, n_red = load_image(fname)
-    insert_metrics(timestamp, n_particles, n_red)
+    n_particles, n_red, n_yellow = load_image(fname)
+    insert_metrics(timestamp, n_particles, n_red, n_yellow)
 
     with open(fname, 'rb') as f:
         image_data = f.read()
@@ -81,7 +80,6 @@ for fname in flist:
         base64_image_data += base64.b64encode(image_data).decode('utf-8')
         insert_data(timestamp, base64_image_data)
 
-# Close connection
 conn.commit()
 cursor.close()
 conn.close()
