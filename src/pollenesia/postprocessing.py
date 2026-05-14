@@ -38,7 +38,7 @@ def get_image_fname(fname: str):
     info = f'i_max_sharpness={i_max_sharpness}, range_mm={range_mm:.2f}'
     logger.info(info)
 
-    image_fname = f'image{i_max_sharpness:03d}.webp'
+    image_fname = f'image{i_max_sharpness:03d}.dng'
     image_path = os.path.join(path, image_fname)
     logger.info(image_path)
     f.close()
@@ -48,14 +48,14 @@ def get_image_fname(fname: str):
 def copy_images(fnames: list[str], odir: str):
     for fname in fnames:
         dirname = os.path.basename(os.path.dirname(fname))
-        dst = os.path.join(odir, f'{dirname}.webp')
+        dst = os.path.join(odir, f'{dirname}.dng')
         logger.info(dst)
         shutil.copyfile(fname, dst)
 
 
 def remove_images(dirname: str):
     for fname in os.listdir(dirname):
-        if fname.endswith('.webp'):
+        if fname.endswith('.dng'):
             os.remove(os.path.join(dirname, fname))
 
 

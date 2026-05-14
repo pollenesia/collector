@@ -11,6 +11,8 @@ import pollenesia.postprocessing as pp
 import RPi.GPIO as gpio
 import sys
 import time
+import rawpy
+import imageio
 
 from datetime import datetime
 from h5py import File
@@ -149,16 +151,24 @@ def event_stop(channel: int):
 
 def init_camera():
     camera = Picamera2()
-    config = camera.create_still_configuration({'size': (1024, 1024)})
+    config = camera.create_still_configuration(
+        main={'size': (1024, 1024)},
+        raw={'size': (1024, 1024), 'format': 'SBGGR10'}
+    )
     camera.configure(config)
     camera.start()
     time.sleep(2.0)
-    return camera
+    return camera, config
 
 
-def get_image_file(camera: Picamera2, fname: str) -> dict[str, any]:
-    data = camera.capture_file(fname)
-    return data
+def get_image_file(camera: Picamera2, config: dict, fname: str) -> dict[str, any]:
+    # data = camera.capture_file(fname)
+    buffer, metadata = camera.switch_mode_and_capture_buffers(
+        config, ['raw']
+    )
+    camera.helpers.save_dng(
+        buffer[0], metadata, config['raw'], fname)
+    return metadata
 
 
 def get_image(camera: Picamera2) -> Image:
@@ -172,13 +182,13 @@ def get_sharpness(fname: str):
     return lv
 
 
-def get_data_row(camera: Picamera2, fname: str, dkeys: list[str], position_step: int):
-    dimage = get_image_file(camera, fname)
+def get_data_row(camera: Picamera2, config: dict, fname: str, dkeys: list[str], position_step: int):
+    dimage = get_image_file(camera, config, fname)
     n = len(dkeys)
     row = np.ndarray(n)
     for i, key in enumerate(dkeys[:-3]):
         row[i] = dimage[key]
-    row[-3] = get_sharpness(fname)
+    row[-3] = 0  # get_sharpness(fname)
     row[-2] = position_step
     row[-1] = position_step / 512.0 * THREAD_STEP_MM
     return row
@@ -219,7 +229,7 @@ def init() -> dict:
     data['motor_tape'] = rml.BYJMotor('tape', '28BYJ')
 
     logger.info('camera')
-    data['camera'] = init_camera()
+    data['camera'], data['camcfg'] = init_camera()
 
     logger.info('variables')
     data['is_home_fixed'] = False
@@ -374,9 +384,10 @@ def main():
                         data['command'] = 'store_data'
                     else:
                         data['position_step'] += step_size
-                        fname = f'{dirname}/image{i_image:03d}.webp'
+                        fname = f'{dirname}/image{i_image:03d}.dng'
                         row = get_data_row(
                             data['camera'],
+                            data['camcfg'],
                             fname,
                             dkeys,
                             data['position_step']
@@ -436,12 +447,24 @@ def main():
                         data['position_step'] += step_size
                     send_state(data)
                 elif command == 'get_image':
-                    image = get_image(data['camera'])
+                    dng_buffer = BytesIO()
+                    buffer, metadata = data['camera'].switch_mode_and_capture_buffers(
+                        data['camcfg'], ['raw']
+                    )
+                    data['camera'].helpers.save_dng(
+                        buffer[0], metadata, data['camcfg']['raw'], dng_buffer)
+                    dng_buffer.seek(0)
+                    raw = rawpy.imread(dng_buffer)
+                    rgb_image = raw.postprocess(
+                        use_camera_wb=True,
+                        no_auto_bright=True,
+                        gamma=(1, 1)
+                    )
                     buffer = BytesIO()
-                    image.save(buffer, format='webp')
+                    imageio.imwrite(buffer, rgb_image, 'png')
                     b = buffer.getvalue()
                     s = base64.b64encode(b).decode('utf-8')
-                    payload = f'data:image/webp;base64,{s}'
+                    payload = f'data:image/png;base64,{s}'
                     mqtt_client.publish('pollenesia/img', payload=payload)
                     data['command'] = ''
                 elif command == 'go_steps':
