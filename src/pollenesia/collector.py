@@ -200,14 +200,19 @@ def release_break(release: bool):
     logger.info(f'break release set to {release}')
 
 
-def pass_tape(motor: rml.BYJMotor, range: int):
-    pretension = 64
+def pass_tape(motor: rml.BYJMotor, steps: int):
+    pretension = 32
+    n_unstuck = 3
     release_break(True)
     motor.motor_run(PIN_MOTOR2, 0.01, pretension,
                     BACKWARD, False, 'full', 0.05)
+    for _ in range(n_unstuck):
+        release_break(False)
+        time.sleep(0.2)
+        release_break(True)
     time.sleep(1.0)
-    logger.info(f'passing tape to {range} steps')
-    motor.motor_run(PIN_MOTOR2, 0.01, range,
+    logger.info(f'passing tape to {steps} steps')
+    motor.motor_run(PIN_MOTOR2, 0.01, steps,
                     FORWARD, False, 'full', 0.05)
     release_break(False)
     motor.motor_run(PIN_MOTOR2, 0.01, pretension*2,
