@@ -20,6 +20,7 @@ from io import BytesIO
 from picamera2 import Picamera2
 from PIL import Image
 from RpiMotorLib import RpiMotorLib as rml
+from pollenesia.utils import get_logger
 
 '''bash
 rpicam-vid -o udp://192.168.1.64:8888 -t0 -v0 --flush=1 --framerate=10
@@ -41,25 +42,14 @@ STEP_SIZE = 1000
 
 DATA_CALLBACK = {}
 
-
-def get_logger(name: str):
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-    stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(logging.INFO)
-    stream_handler.setFormatter(logging.Formatter(LOG_FORMAT))
-    logger.addHandler(stream_handler)
-    return logger
-
-
-logger = get_logger(__name__)
-
 PIN_STOP = 12
 PIN_BREAK = 7
 PIN_MOTOR1 = [18, 23, 24, 25]
 PIN_MOTOR2 = [6, 13, 19, 26]
 FORWARD = False
 BACKWARD = True
+
+logger = get_logger(__name__)
 
 
 def is_home() -> bool:
