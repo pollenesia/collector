@@ -466,10 +466,10 @@ def main():
                         gamma=(1, 1)
                     )
                     buffer = BytesIO()
-                    imageio.imwrite(buffer, rgb_image, 'png')
+                    imageio.imwrite(buffer, rgb_image, 'webp')
                     b = buffer.getvalue()
                     s = base64.b64encode(b).decode('utf-8')
-                    payload = f'data:image/png;base64,{s}'
+                    payload = f'data:image/webp;base64,{s}'
                     mqtt_client.publish('pollenesia/img', payload=payload)
                     data['command'] = ''
                 elif command == 'go_steps':
