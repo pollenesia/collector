@@ -43,7 +43,8 @@
             "console": "integratedTerminal",
             "args": [
                 // "~/tmp/0_pollenesia/filtered/260505*.webp"
-                "~/tmp/0_pollenesia/filtered/*.webp"
+                "~/tmp/0_pollenesia/filtered/260525201959.dng"
+                // "~/tmp/0_pollenesia/filtered/260526*.dng"
             ]
         },
         {
