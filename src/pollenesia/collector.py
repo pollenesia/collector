@@ -33,7 +33,7 @@ ffplay tcp://rpi1.local:8888 -f rawvideo -fflags nobuffer -pixel_format yuv420p 
 LOG_FORMAT = f"%(asctime)s [%(levelname)s] %(filename)s %(funcName)s(%(lineno)d): %(message)s"
 
 THREAD_STEP_MM = 0.8
-THREAD_LENGTH_MM = 8.0
+THREAD_LENGTH_MM = 10.0
 THREAD_N = THREAD_LENGTH_MM / THREAD_STEP_MM
 MAX_STEPS = int(512.0 * THREAD_N)
 
