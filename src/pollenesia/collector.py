@@ -355,7 +355,7 @@ def main():
                 elif command == 'pass_tape':
                     pass_tape(data['motor_tape'], m_pass_step)
                     data['command'] = 'go_to'
-                    data['value'] = int(6.0 / THREAD_STEP_MM * 512.0)
+                    data['value'] = int(7.0 / THREAD_STEP_MM * 512.0)
                 elif command == 'go_to':
                     step_size = go_to(data, data['value'])
                     if step_size == 0:
@@ -370,7 +370,7 @@ def main():
                     logger.info(f'dirname: {dirname}')
                     os.makedirs(dirname, exist_ok=True)
                     i_image = 0
-                    data['value'] = int(8.0 / THREAD_STEP_MM * 512.0)
+                    data['value'] = int(9.0 / THREAD_STEP_MM * 512.0)
                     data['command'] = 'make_images'
                 elif command == 'make_images':
                     step_size = go_to(data, data['value'], image_shot_step)
