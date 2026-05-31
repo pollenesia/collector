@@ -324,7 +324,7 @@ def main():
 
     # mode = 'manual'
     mode = 'auto'
-    m_pass_step = 16
+    m_pass_step = 10
     image_shot_step = 3
 
     img_data = np.ndarray((0, len(dkeys)))
